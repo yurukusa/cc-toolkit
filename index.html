@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>cc-toolkit — Understand your Claude Code usage</title>
-  <meta name="description" content="5 free tools to analyze your Claude Code sessions, autonomy, ghost days, personality and year in review. Zero dependencies. Runs entirely local.">
+  <meta name="description" content="8 free tools to analyze your Claude Code sessions, autonomy, ghost days, personality, costs and year in review. Zero dependencies. Runs entirely local.">
   <meta property="og:title" content="cc-toolkit — Understand your Claude Code usage">
-  <meta property="og:description" content="5 free CLI tools for Claude Code users. See your hours, AI autonomy ratio, ghost days, developer archetype, and year in review.">
+  <meta property="og:description" content="8 free tools for Claude Code users. See your hours, AI autonomy ratio, ghost days, developer archetype, costs, and year in review.">
   <style>
     :root {
       --bg: #0d1117;
@@ -39,6 +39,7 @@
     .tool-card.green { border-top: 3px solid var(--green); }
     .tool-card.orange { border-top: 3px solid var(--orange); }
     .tool-card.blue { border-top: 3px solid var(--blue); }
+    .tool-card.red { border-top: 3px solid var(--red); }
 
     .tool-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; font-family: monospace; }
     .tool-card.cyan .tool-name { color: var(--cyan); }
@@ -47,6 +48,7 @@
     .tool-card.green .tool-name { color: var(--green); }
     .tool-card.orange .tool-name { color: var(--orange); }
     .tool-card.blue .tool-name { color: var(--blue); }
+    .tool-card.red .tool-name { color: var(--red); }
 
     .tool-tagline { font-size: 0.85rem; color: var(--muted); margin-bottom: 14px; }
     .tool-cmd { background: #010409; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 0.82rem; color: var(--green); margin-bottom: 14px; }
@@ -83,11 +85,11 @@
   <header>
     <div class="badge">Zero dependencies · Runs entirely local · Free</div>
     <h1>cc-toolkit</h1>
-    <p>5 CLI tools to understand what's really happening in your Claude Code sessions.</p>
+    <p>8 free tools to understand what's really happening in your Claude Code sessions.</p>
   </header>
 
   <div class="stats-strip">
-    <div class="stat"><div class="stat-n">5</div><div class="stat-l">Free tools</div></div>
+    <div class="stat"><div class="stat-n">8</div><div class="stat-l">Free tools</div></div>
     <div class="stat"><div class="stat-n">0</div><div class="stat-l">Dependencies</div></div>
     <div class="stat"><div class="stat-n">100%</div><div class="stat-l">Local — no data leaves your machine</div></div>
   </div>
@@ -165,6 +167,26 @@
         <a href="https://yurukusa.github.io/cc-roast/" class="tool-link">Browser →</a>
         <a href="https://github.com/yurukusa/cc-roast" class="tool-link">GitHub</a>
         <a href="https://www.npmjs.com/package/cc-roast" class="tool-link npm">npm</a>
+      </div>
+    </div>
+
+    <div class="tool-card red">
+      <div class="tool-name">cc-bingo</div>
+      <div class="tool-tagline">How many of these have happened to you?</div>
+      <div class="tool-detail">50 relatable Claude Code moments, randomized into a 5×5 bingo card. Click to mark, get bingo, share the pain.</div>
+      <div class="tool-links">
+        <a href="https://yurukusa.github.io/cc-bingo/" class="tool-link">Browser →</a>
+        <a href="https://github.com/yurukusa/cc-bingo" class="tool-link">GitHub</a>
+      </div>
+    </div>
+
+    <div class="tool-card cyan">
+      <div class="tool-name">cc-cost-check</div>
+      <div class="tool-tagline">Know what your AI costs per commit.</div>
+      <div class="tool-detail">Interactive cost calculator. See cost per hour, per commit, per day — and compare against hiring a junior or senior developer.</div>
+      <div class="tool-links">
+        <a href="https://yurukusa.github.io/cc-cost-check/" class="tool-link">Browser →</a>
+        <a href="https://github.com/yurukusa/cc-cost-check" class="tool-link">GitHub</a>
       </div>
     </div>
 
