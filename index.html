@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cc-toolkit — Understand your Claude Code usage</title>
+  <meta name="description" content="5 free tools to analyze your Claude Code sessions, autonomy, ghost days, personality and year in review. Zero dependencies. Runs entirely local.">
+  <meta property="og:title" content="cc-toolkit — Understand your Claude Code usage">
+  <meta property="og:description" content="5 free CLI tools for Claude Code users. See your hours, AI autonomy ratio, ghost days, developer archetype, and year in review.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --cyan: #58d8f0;
+      --yellow: #f7c948;
+      --green: #56d364;
+      --orange: #ffa657;
+      --purple: #bc8cff;
+      --blue: #58a6ff;
+      --red: #ff7b72;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; line-height: 1.6; }
+    .container { max-width: 860px; margin: 0 auto; padding: 48px 20px; }
+    header { text-align: center; margin-bottom: 64px; }
+    header h1 { font-size: 2.5rem; font-weight: 800; color: var(--cyan); margin-bottom: 12px; letter-spacing: -0.5px; }
+    header p { color: var(--muted); font-size: 1.1rem; max-width: 500px; margin: 0 auto; }
+    .badge { display: inline-block; background: rgba(88,216,240,0.1); border: 1px solid var(--cyan); color: var(--cyan); font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; margin-bottom: 16px; }
+
+    .tools-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 48px; }
+    .tool-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 24px; transition: border-color 0.2s, transform 0.2s; position: relative; }
+    .tool-card:hover { transform: translateY(-2px); }
+    .tool-card.cyan { border-top: 3px solid var(--cyan); }
+    .tool-card.yellow { border-top: 3px solid var(--yellow); }
+    .tool-card.purple { border-top: 3px solid var(--purple); }
+    .tool-card.green { border-top: 3px solid var(--green); }
+    .tool-card.orange { border-top: 3px solid var(--orange); }
+    .tool-card.blue { border-top: 3px solid var(--blue); }
+
+    .tool-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; font-family: monospace; }
+    .tool-card.cyan .tool-name { color: var(--cyan); }
+    .tool-card.yellow .tool-name { color: var(--yellow); }
+    .tool-card.purple .tool-name { color: var(--purple); }
+    .tool-card.green .tool-name { color: var(--green); }
+    .tool-card.orange .tool-name { color: var(--orange); }
+    .tool-card.blue .tool-name { color: var(--blue); }
+
+    .tool-tagline { font-size: 0.85rem; color: var(--muted); margin-bottom: 14px; }
+    .tool-cmd { background: #010409; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 0.82rem; color: var(--green); margin-bottom: 14px; }
+    .tool-detail { font-size: 0.8rem; color: var(--muted); line-height: 1.5; margin-bottom: 16px; }
+    .tool-links { display: flex; gap: 10px; flex-wrap: wrap; }
+    .tool-link { font-size: 0.78rem; color: var(--cyan); text-decoration: none; border: 1px solid var(--border); padding: 4px 10px; border-radius: 6px; }
+    .tool-link:hover { border-color: var(--cyan); }
+    .tool-link.npm { color: var(--red); border-color: transparent; }
+    .tool-link.npm:hover { border-color: var(--red); }
+
+    .new-badge { position: absolute; top: 14px; right: 14px; background: var(--yellow); color: #0d1117; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+
+    .cta-section { background: var(--surface); border: 1px solid var(--orange); border-radius: 14px; padding: 32px; text-align: center; margin-bottom: 48px; }
+    .cta-section h2 { font-size: 1.2rem; color: var(--orange); margin-bottom: 8px; }
+    .cta-section p { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; max-width: 480px; margin-left: auto; margin-right: auto; }
+    .cta-btn { display: inline-block; background: var(--orange); color: #0d1117; padding: 12px 28px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 0.95rem; }
+    .cta-btn:hover { opacity: 0.9; }
+
+    .stats-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 48px; }
+    .stat { text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .stat-n { font-size: 2rem; font-weight: 700; color: var(--cyan); }
+    .stat-l { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+
+    footer { text-align: center; color: var(--muted); font-size: 0.8rem; padding-top: 24px; border-top: 1px solid var(--border); }
+    footer a { color: var(--cyan); text-decoration: none; }
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.8rem; }
+      .stats-strip { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="badge">Zero dependencies · Runs entirely local · Free</div>
+    <h1>cc-toolkit</h1>
+    <p>5 CLI tools to understand what's really happening in your Claude Code sessions.</p>
+  </header>
+
+  <div class="stats-strip">
+    <div class="stat"><div class="stat-n">5</div><div class="stat-l">Free tools</div></div>
+    <div class="stat"><div class="stat-n">0</div><div class="stat-l">Dependencies</div></div>
+    <div class="stat"><div class="stat-n">100%</div><div class="stat-l">Local — no data leaves your machine</div></div>
+  </div>
+
+  <div class="tools-grid">
+
+    <div class="tool-card cyan">
+      <div class="tool-name">cc-session-stats</div>
+      <div class="tool-tagline">How much time do you actually spend with Claude Code?</div>
+      <div class="tool-cmd">npx cc-session-stats</div>
+      <div class="tool-detail">Total hours, active days, streaks, top projects, day-of-week patterns, health warnings.</div>
+      <div class="tool-links">
+        <a href="https://yurukusa.github.io/cc-session-stats/" class="tool-link">Browser →</a>
+        <a href="https://github.com/yurukusa/cc-session-stats" class="tool-link">GitHub</a>
+        <a href="https://www.npmjs.com/package/cc-session-stats" class="tool-link npm">npm</a>
+      </div>
+    </div>
+
+    <div class="tool-card yellow">
+      <div class="new-badge">NEW</div>
+      <div class="tool-name">cc-agent-load</div>
+      <div class="tool-tagline">How much of your usage is YOU vs AI subagents?</div>
+      <div class="tool-cmd">npx cc-agent-load</div>
+      <div class="tool-detail">Splits interactive sessions from autonomous subagent runs. Shows autonomy ratio, Ghost Days, and a GitHub-style activity calendar.</div>
+      <div class="tool-links">
+        <a href="https://yurukusa.github.io/cc-agent-load/" class="tool-link">Browser →</a>
+        <a href="https://github.com/yurukusa/cc-agent-load" class="tool-link">GitHub</a>
+        <a href="https://www.npmjs.com/package/cc-agent-load" class="tool-link npm">npm</a>
+      </div>
+    </div>
+
+    <div class="tool-card purple">
+      <div class="new-badge">NEW</div>
+      <div class="tool-name">cc-ghost-log</div>
+      <div class="tool-tagline">What did your AI commit while you were gone?</div>
+      <div class="tool-cmd">npx cc-ghost-log</div>
+      <div class="tool-detail">Shows git commits from Ghost Days — days when AI ran autonomously while you had zero interactive sessions. Your AI's work diary.</div>
+      <div class="tool-links">
+        <a href="https://github.com/yurukusa/cc-ghost-log" class="tool-link">GitHub</a>
+        <a href="https://www.npmjs.com/package/cc-ghost-log" class="tool-link npm">npm</a>
+      </div>
+    </div>
+
+    <div class="tool-card green">
+      <div class="tool-name">cc-personality</div>
+      <div class="tool-tagline">What kind of Claude Code developer are you?</div>
+      <div class="tool-cmd">npx cc-personality</div>
+      <div class="tool-detail">Analyzes your session patterns and assigns you a developer archetype — Architect, Sprinter, Overnight Builder, and more.</div>
+      <div class="tool-links">
+        <a href="https://yurukusa.github.io/cc-personality/" class="tool-link">Browser →</a>
+        <a href="https://github.com/yurukusa/cc-personality" class="tool-link">GitHub</a>
+        <a href="https://www.npmjs.com/package/cc-personality" class="tool-link npm">npm</a>
+      </div>
+    </div>
+
+    <div class="tool-card orange">
+      <div class="tool-name">cc-wrapped</div>
+      <div class="tool-tagline">Your Claude Code year in review.</div>
+      <div class="tool-cmd">npx cc-wrapped</div>
+      <div class="tool-detail">Spotify Wrapped–style visualization of your Claude Code usage. Shareable stats card with top projects, busiest days, and usage milestones.</div>
+      <div class="tool-links">
+        <a href="https://yurukusa.github.io/cc-wrapped/" class="tool-link">Browser →</a>
+        <a href="https://github.com/yurukusa/cc-wrapped" class="tool-link">GitHub</a>
+        <a href="https://www.npmjs.com/package/cc-wrapped" class="tool-link npm">npm</a>
+      </div>
+    </div>
+
+    <div class="tool-card blue">
+      <div class="tool-name">cc-roast</div>
+      <div class="tool-tagline">Let Claude Code roast your session habits.</div>
+      <div class="tool-cmd">npx cc-roast</div>
+      <div class="tool-detail">Paste your session JSON and get a brutally honest (and funny) analysis of your Claude Code habits. Don't take it personally.</div>
+      <div class="tool-links">
+        <a href="https://yurukusa.github.io/cc-roast/" class="tool-link">Browser →</a>
+        <a href="https://github.com/yurukusa/cc-roast" class="tool-link">GitHub</a>
+        <a href="https://www.npmjs.com/package/cc-roast" class="tool-link npm">npm</a>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="cta-section">
+    <h2>Heavy Claude Code user?</h2>
+    <p>If your stats show high usage, you probably want guardrails. <strong style="color:var(--text)">Claude Code Production Hooks</strong> — 10 hooks + 5 templates covering 18/20 health checks. Used by power users who run autonomous pipelines.</p>
+    <a href="https://yurukusa.gumroad.com/l/cc-codex-ops-kit" target="_blank" class="cta-btn">Get the Hooks Kit — $4.99 →</a>
+  </div>
+
+  <footer>
+    <p>Built by <a href="https://github.com/yurukusa">yurukusa</a> · All tools are free & open source · Zero dependencies · Local only</p>
+    <p style="margin-top:8px;"><a href="https://github.com/yurukusa">GitHub</a> · <a href="https://note.com/yurukusa">note</a> · <a href="https://zenn.dev/yurukusa">Zenn</a></p>
+  </footer>
+</div>
+</body>
+</html>
