@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>cc-toolkit — Understand your Claude Code usage</title>
-  <meta name="description" content="8 free tools to analyze your Claude Code sessions, autonomy, ghost days, personality, costs and year in review. Zero dependencies. Runs entirely local.">
+  <meta name="description" content="9 free tools to analyze your Claude Code sessions, autonomy, ghost days, personality, costs and year in review. Zero dependencies. Runs entirely local.">
   <meta property="og:title" content="cc-toolkit — Understand your Claude Code usage">
-  <meta property="og:description" content="8 free tools for Claude Code users. See your hours, AI autonomy ratio, ghost days, developer archetype, costs, and year in review.">
+  <meta property="og:description" content="9 free tools for Claude Code users. See your hours, AI autonomy ratio, ghost days, developer archetype, costs, and year in review.">
   <style>
     :root {
       --bg: #0d1117;
@@ -21,6 +21,7 @@
       --purple: #bc8cff;
       --blue: #58a6ff;
       --red: #ff7b72;
+      --teal: #20c997;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; line-height: 1.6; }
@@ -40,6 +41,7 @@
     .tool-card.orange { border-top: 3px solid var(--orange); }
     .tool-card.blue { border-top: 3px solid var(--blue); }
     .tool-card.red { border-top: 3px solid var(--red); }
+    .tool-card.teal { border-top: 3px solid var(--teal); }
 
     .tool-name { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; font-family: monospace; }
     .tool-card.cyan .tool-name { color: var(--cyan); }
@@ -49,6 +51,7 @@
     .tool-card.orange .tool-name { color: var(--orange); }
     .tool-card.blue .tool-name { color: var(--blue); }
     .tool-card.red .tool-name { color: var(--red); }
+    .tool-card.teal .tool-name { color: var(--teal); }
 
     .tool-tagline { font-size: 0.85rem; color: var(--muted); margin-bottom: 14px; }
     .tool-cmd { background: #010409; border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 0.82rem; color: var(--green); margin-bottom: 14px; }
@@ -85,11 +88,11 @@
   <header>
     <div class="badge">Zero dependencies · Runs entirely local · Free</div>
     <h1>cc-toolkit</h1>
-    <p>8 free tools to understand what's really happening in your Claude Code sessions.</p>
+    <p>9 free tools to understand what's really happening in your Claude Code sessions.</p>
   </header>
 
   <div class="stats-strip">
-    <div class="stat"><div class="stat-n">8</div><div class="stat-l">Free tools</div></div>
+    <div class="stat"><div class="stat-n">9</div><div class="stat-l">Free tools</div></div>
     <div class="stat"><div class="stat-n">0</div><div class="stat-l">Dependencies</div></div>
     <div class="stat"><div class="stat-n">100%</div><div class="stat-l">Local — no data leaves your machine</div></div>
   </div>
@@ -187,6 +190,17 @@
       <div class="tool-links">
         <a href="https://yurukusa.github.io/cc-cost-check/" class="tool-link">Browser →</a>
         <a href="https://github.com/yurukusa/cc-cost-check" class="tool-link">GitHub</a>
+      </div>
+    </div>
+
+    <div class="tool-card teal">
+      <div class="tool-name">cc-health-check</div>
+      <div class="tool-tagline">Is your Claude Code setup production-ready?</div>
+      <div class="tool-cmd">npx cc-health-check</div>
+      <div class="tool-detail">20-question diagnostic across 6 dimensions — Safety, Quality, Monitoring, Recovery, Autonomy, Coordination. Instant score with actionable fixes.</div>
+      <div class="tool-links">
+        <a href="https://yurukusa.github.io/cc-health-check/" class="tool-link">Browser →</a>
+        <a href="https://github.com/yurukusa/cc-health-check" class="tool-link">GitHub</a>
       </div>
     </div>
 
