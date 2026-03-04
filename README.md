@@ -1,6 +1,6 @@
 # cc-toolkit
 
-**44 free tools to understand your Claude Code usage.**
+**48 free tools to understand your Claude Code usage.**
 
 Built over 60 days of running Claude Code autonomously, 24/7. These tools answer the questions I kept asking myself:
 
