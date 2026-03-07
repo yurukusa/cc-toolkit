@@ -1,0 +1,19 @@
+{
+  "name": "cc-cost-forecast",
+  "version": "1.0.0",
+  "description": "Project your Claude Code API cost to month-end",
+  "type": "module",
+  "bin": {
+    "cc-cost-forecast": "cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": ["claude", "claude-code", "ai", "cost", "forecast", "budget", "monitoring"],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-cost-forecast"
+  }
+}

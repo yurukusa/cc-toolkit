@@ -1,0 +1,5 @@
+out/
+node_modules/
+*.vsix
+# dist/ is committed intentionally — required for GitHub Action to work without a build step
+

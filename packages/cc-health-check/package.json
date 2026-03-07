@@ -1,0 +1,33 @@
+{
+  "name": "cc-health-check",
+  "version": "1.0.0",
+  "description": "CLI diagnostic for your Claude Code setup. 20 checks across 6 dimensions.",
+  "bin": {
+    "cc-health-check": "./cli.mjs"
+  },
+  "type": "module",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai",
+    "diagnostic",
+    "health-check",
+    "hooks",
+    "autonomous",
+    "agent"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-health-check"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ]
+}

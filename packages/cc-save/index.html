@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cc-save — How much has Claude's cache saved you?</title>
+<style>
+  :root {
+    --bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+    --green:#3fb950;--yellow:#d29922;--blue:#58a6ff;--purple:#bc8cff;--orange:#ffa657;--accent:#58d8f0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;padding:2rem 1rem;}
+  .container{max-width:780px;margin:0 auto;}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:.25rem;}
+  h1 span{color:var(--accent);}
+  .subtitle{color:var(--dim);font-size:.9rem;margin-bottom:2rem;}
+  .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:2.5rem;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:2rem;}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:#0d1a1f;}
+  .upload-zone p{color:var(--dim);font-size:.9rem;margin-top:.5rem;}
+  .upload-btn{background:var(--accent);color:#0d1117;border:none;padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:.9rem;}
+  .demo-btn{background:transparent;border:1px solid var(--border);color:var(--dim);padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem;margin-top:.75rem;}
+  .demo-btn:hover{border-color:var(--accent);color:var(--text);}
+  #results{display:none;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem;}
+  .card-title{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin-bottom:.75rem;}
+  .big-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1rem;}
+  .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center;}
+  .stat-val{font-size:1.6rem;font-weight:800;line-height:1;}
+  .stat-key{font-size:.75rem;color:var(--dim);margin-top:.3rem;}
+  .cost-row{display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.85rem;}
+  .cost-row:last-child{border:none;}
+  .cost-val{font-weight:700;}
+  .cost-dim{color:var(--dim);font-size:.78rem;}
+  .bar-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem;font-size:.85rem;}
+  .bar-label{width:130px;color:var(--dim);flex-shrink:0;}
+  .bar-track{flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:5px;transition:width .6s ease;}
+  .bar-pct{width:48px;text-align:right;font-weight:600;}
+  .insight{background:#0d1a1f;border:1px solid var(--accent);border-radius:8px;padding:1rem 1.25rem;font-size:.9rem;line-height:1.5;margin-bottom:1rem;}
+  .path-hint{background:#1e1a0c;border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem;font-size:.8rem;color:var(--dim);font-family:monospace;margin-bottom:2rem;}
+  .pricing{font-size:.78rem;color:var(--dim);margin-top:.5rem;}
+  @media(max-width:540px){.big-stats{grid-template-columns:1fr 1fr;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><span>cc-save</span></h1>
+  <p class="subtitle">How much money has Claude's prompt cache saved you?</p>
+  <div class="path-hint">📁 ~/.claude/projects/&lt;project&gt;/*.jsonl — drag files below</div>
+  <div class="upload-zone" id="dz">
+    <button class="upload-btn" onclick="document.getElementById('fi').click()">Upload JSONL files</button>
+    <p>or drag and drop from ~/.claude/projects/</p><br>
+    <button class="demo-btn" onclick="loadDemo()">Try with demo data</button>
+    <input type="file" id="fi" accept=".jsonl" multiple style="display:none" onchange="handleFiles(this.files)">
+  </div>
+  <div id="results">
+    <div class="big-stats">
+      <div class="stat-box"><div class="stat-val" id="vSavings" style="color:var(--purple)">—</div><div class="stat-key">cache savings</div></div>
+      <div class="stat-box"><div class="stat-val" id="vSavingsPct" style="color:var(--green)">—</div><div class="stat-key">% less than no-cache</div></div>
+      <div class="stat-box"><div class="stat-val" id="vHitRate" style="color:var(--accent)">—</div><div class="stat-key">cache hit rate</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Cost breakdown</div>
+      <div class="cost-row"><span>Input (fresh)</span><div><span class="cost-val" id="cInput">—</span> <span class="cost-dim" id="dInput"></span></div></div>
+      <div class="cost-row"><span style="color:var(--green)">Cache reads</span><div><span class="cost-val" id="cCacheR" style="color:var(--green)">—</span> <span class="cost-dim" id="dCacheR"></span></div></div>
+      <div class="cost-row"><span>Cache written</span><div><span class="cost-val" id="cCacheW">—</span> <span class="cost-dim" id="dCacheW"></span></div></div>
+      <div class="cost-row"><span>Output</span><div><span class="cost-val" id="cOutput">—</span> <span class="cost-dim" id="dOutput"></span></div></div>
+      <div class="cost-row" style="border-top:2px solid var(--border);margin-top:.25rem;padding-top:.5rem"><span style="font-weight:600">Actual total</span><span class="cost-val" id="cTotal" style="color:var(--accent)">—</span></div>
+      <div class="cost-row"><span style="color:var(--dim)">Without caching</span><span class="cost-val" id="cHypo" style="color:var(--dim)">—</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Cache efficiency</div>
+      <div class="bar-row"><span class="bar-label">Cache hit rate</span><div class="bar-track"><div class="bar-fill" id="bHit" style="background:var(--green)"></div></div><span class="bar-pct" id="pHit">—</span></div>
+      <div class="bar-row"><span class="bar-label">Savings rate</span><div class="bar-track"><div class="bar-fill" id="bSave" style="background:var(--purple)"></div></div><span class="bar-pct" id="pSave">—</span></div>
+      <p id="perSession" style="font-size:.82rem;color:var(--dim);margin-top:.75rem"></p>
+      <div class="pricing">Pricing: Sonnet 4.6 defaults — input $3.00/1M · cache-read $0.30/1M (10× cheaper) · cache-write $3.75/1M · output $15.00/1M</div>
+    </div>
+    <div id="insightBox"></div>
+  </div>
+</div>
+<script>
+const PRICE={input:3.00,cacheR:0.30,cacheW:3.75,output:15.00};
+const dz=document.getElementById('dz');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');handleFiles(e.dataTransfer.files);});
+function handleFiles(files){
+  Promise.all([...files].map(f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(f);})))
+    .then(texts=>analyze(texts.join('\n')));
+}
+function analyze(raw){
+  let tI=0,tCR=0,tCW=0,tO=0,turns=0,sessions=0;
+  const sessionSet=new Set();
+  for(const line of raw.split('\n')){
+    if(!line)continue;
+    let d;try{d=JSON.parse(line);}catch{continue;}
+    const sid=d.sessionId||d.session_id||'x';
+    const msg=d.message||d;
+    if(msg&&msg.role==='assistant'&&msg.usage){
+      const u=msg.usage;
+      tI+=u.input_tokens||0;
+      tCR+=u.cache_read_input_tokens||0;
+      tCW+=u.cache_creation_input_tokens||0;
+      tO+=u.output_tokens||0;
+      turns++;
+      sessionSet.add(sid);
+    }
+  }
+  sessions=sessionSet.size;
+  if(!turns){alert('No usage data found.');return;}
+  const M=1_000_000;
+  const cI=tI*PRICE.input/M,cCR=tCR*PRICE.cacheR/M,cCW=tCW*PRICE.cacheW/M,cO=tO*PRICE.output/M;
+  const actual=cI+cCR+cCW+cO;
+  const hypo=(tI+tCR)*PRICE.input/M+cCW+cO;
+  const savings=hypo-actual;
+  const savingsPct=Math.round(savings/hypo*100);
+  const hitRate=Math.round(tCR/(tI+tCR+tCW)*100);
+  render({tI,tCR,tCW,tO,cI,cCR,cCW,cO,actual,hypo,savings,savingsPct,hitRate,sessions,turns});
+}
+function fmtD(n){if(n>=1000)return '$'+(n/1000).toFixed(1)+'K';if(n>=1)return '$'+n.toFixed(2);return '$'+n.toFixed(4);}
+function fmtK(n){if(n>=1e9)return(n/1e9).toFixed(1)+'B';if(n>=1e6)return(n/1e6).toFixed(1)+'M';if(n>=1e3)return(n/1e3).toFixed(0)+'K';return Math.round(n).toString();}
+function render(d){
+  document.getElementById('results').style.display='block';
+  document.getElementById('vSavings').textContent=fmtD(d.savings);
+  document.getElementById('vSavingsPct').textContent=d.savingsPct+'%';
+  document.getElementById('vHitRate').textContent=d.hitRate+'%';
+  document.getElementById('cInput').textContent=fmtD(d.cI);
+  document.getElementById('dInput').textContent=fmtK(d.tI)+' tokens';
+  document.getElementById('cCacheR').textContent=fmtD(d.cCR);
+  document.getElementById('dCacheR').textContent=fmtK(d.tCR)+' tokens';
+  document.getElementById('cCacheW').textContent=fmtD(d.cCW);
+  document.getElementById('dCacheW').textContent=fmtK(d.tCW)+' tokens';
+  document.getElementById('cOutput').textContent=fmtD(d.cO);
+  document.getElementById('dOutput').textContent=fmtK(d.tO)+' tokens';
+  document.getElementById('cTotal').textContent=fmtD(d.actual);
+  document.getElementById('cHypo').textContent=fmtD(d.hypo)+' (no caching)';
+  const p=n=>n+'%';
+  document.getElementById('bHit').style.width=p(d.hitRate);document.getElementById('pHit').textContent=p(d.hitRate);
+  document.getElementById('bSave').style.width=p(d.savingsPct);document.getElementById('pSave').textContent=p(d.savingsPct);
+  document.getElementById('perSession').textContent=`${d.sessions} sessions, ${d.turns.toLocaleString()} turns · ${fmtD(d.savings/d.sessions)} saved per session · ${fmtD(d.actual/d.sessions)} actual cost per session`;
+  document.getElementById('insightBox').innerHTML=`<div class="insight"><strong>Prompt caching saved you ${fmtD(d.savings)} (${d.savingsPct}% of your hypothetical bill).</strong><br>${fmtK(d.tCR)} cache-read tokens cost ${fmtD(d.cCR)} instead of ${fmtD(d.tCR*PRICE.input/1e6)} — a 10× reduction. Cache hit rate: ${d.hitRate}% of all input.</div>`;
+}
+function loadDemo(){render({tI:5100000,tCR:22100000000,tCW:668600000,tO:19400000,cI:15.30,cCR:6630,cCW:2507,cO:291,actual:9443,hypo:69143,savings:59700,savingsPct:86,hitRate:97,sessions:519,turns:219669});}
+</script>
+</body>
+</html>

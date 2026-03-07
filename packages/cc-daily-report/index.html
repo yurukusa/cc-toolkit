@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cc-daily-report — AI Activity Report</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px; }
+
+  h1 { font-family: monospace; font-size: 1.3rem; color: #58a6ff; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 32px; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; margin-bottom: 24px; }
+  .date-input { background: #161b22; border: 1px solid #30363d; color: #e6edf3; padding: 8px 14px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; }
+  .date-input:focus { outline: none; border-color: #58a6ff; }
+
+  .picker-btn { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: background 0.15s; }
+  .picker-btn:hover { background: #30363d; }
+  #fileInput { display: none; }
+
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px; width: 100%; max-width: 560px; }
+
+  .status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; margin-bottom: 24px; }
+  .ghost { background: rgba(255,215,0,0.12); color: #ffd700; border: 1px solid rgba(255,215,0,0.3); }
+  .both { background: rgba(88,166,255,0.12); color: #79c0ff; border: 1px solid rgba(88,166,255,0.3); }
+  .you-only { background: rgba(86,211,100,0.12); color: #56d364; border: 1px solid rgba(86,211,100,0.3); }
+  .inactive { background: rgba(139,148,158,0.1); color: #8b949e; border: 1px solid #21262d; }
+
+  .row { margin-bottom: 16px; }
+  .row-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8b949e; margin-bottom: 6px; }
+  .bar-wrap { display: flex; align-items: center; gap: 12px; }
+  .bar-track { flex: 1; height: 10px; background: #21262d; border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; transition: width 0.4s; }
+  .bar-you { background: #238636; }
+  .bar-ai { background: #388bfd; }
+  .bar-none { background: #21262d; }
+  .bar-hours { font-size: 0.88rem; font-family: monospace; min-width: 40px; text-align: right; }
+
+  .projects-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #21262d; }
+  .section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8b949e; margin-bottom: 10px; }
+  .project-pill { display: inline-block; background: #21262d; color: #8b949e; padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; margin: 3px 3px 3px 0; font-family: monospace; }
+
+  .tweet-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid #21262d; }
+  .tweet-box { background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 14px; font-family: monospace; font-size: 0.82rem; color: #e6edf3; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+  .tweet-meta { margin-top: 8px; font-size: 0.75rem; color: #8b949e; display: flex; justify-content: space-between; align-items: center; }
+  .copy-btn { background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; }
+  .copy-btn:hover { background: #30363d; color: #e6edf3; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: #8b949e; }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.88rem; line-height: 1.6; }
+
+  .hint { font-size: 0.78rem; color: #8b949e; text-align: center; margin-top: 16px; }
+  .hint a { color: #58a6ff; text-decoration: none; }
+
+  .date-nav { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
+  .nav-btn { background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 4px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+  .nav-btn:hover { background: #30363d; color: #e6edf3; }
+</style>
+</head>
+<body>
+
+<h1>cc-daily-report</h1>
+<p class="subtitle">What did your AI do today? Select your ~/.claude folder.</p>
+
+<div class="controls">
+  <input type="date" class="date-input" id="dateInput">
+  <label class="picker-btn" for="fileInput">
+    📁 Select ~/.claude Folder
+  </label>
+  <input type="file" id="fileInput" webkitdirectory multiple>
+</div>
+
+<div class="date-nav" id="dateNav" style="display:none;">
+  <button class="nav-btn" id="prevDay">← Prev</button>
+  <span id="dateDisplay" style="font-size:0.82rem;color:#8b949e;align-self:center;"></span>
+  <button class="nav-btn" id="nextDay">Next →</button>
+</div>
+
+<div class="card" id="card">
+  <div class="empty-state">
+    <div class="icon">📁</div>
+    <p>Select your <strong>~/.claude</strong> folder to see your daily AI activity report.</p>
+    <br>
+    <p style="color:#8b949e;font-size:0.8rem;">Reads JSONL session transcripts locally.<br>No data leaves your browser.</p>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:16px;">Also available as a CLI: <a href="https://github.com/yurukusa/cc-daily-report" target="_blank">npx cc-daily-report</a> · Part of <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit</a></p>
+
+<script>
+// ── Date helpers ─────────────────────────────────────────────────────────────
+function toLocalDate(d) {
+  return d.toLocaleDateString('sv-SE'); // YYYY-MM-DD in local tz
+}
+function yesterday() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return toLocalDate(d);
+}
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return toLocalDate(d);
+}
+function fmtDate(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+// ── Parse project name from file path ────────────────────────────────────────
+function cleanProjectName(dirName) {
+  if (!dirName) return '?';
+  if (dirName.startsWith('-tmp')) return '/tmp';
+  const parts = dirName.split('-').filter(Boolean);
+  if (parts[0] === 'home' && parts.length >= 2) {
+    const rest = parts.slice(2);
+    if (rest.length === 0) return '~';
+    if (rest[0] === 'projects') rest.shift();
+    return rest.join('-') || '~';
+  }
+  return dirName;
+}
+
+// ── Read JSONL file (first + last line only for efficiency) ───────────────────
+async function readFirstLast(file) {
+  const CHUNK = 4096;
+  const size = file.size;
+  if (size === 0) return null;
+
+  try {
+    const headBuf = await file.slice(0, Math.min(CHUNK, size)).arrayBuffer();
+    const headText = new TextDecoder().decode(headBuf);
+    const firstLine = headText.split('\n').find(l => l.trim());
+    if (!firstLine) return null;
+
+    let lastLine = null;
+    const tailBuf = await file.slice(Math.max(0, size - CHUNK)).arrayBuffer();
+    const tailText = new TextDecoder().decode(tailBuf);
+    const tailLines = tailText.split('\n').filter(l => l.trim());
+    lastLine = tailLines[tailLines.length - 1];
+    if (!lastLine) lastLine = firstLine;
+
+    const parseTs = line => {
+      try { return new Date(JSON.parse(line).timestamp || '').getTime() || null; }
+      catch { return null; }
+    };
+    const first = parseTs(firstLine);
+    const last = parseTs(lastLine);
+    return (first && last) ? { first, last } : null;
+  } catch { return null; }
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let _cachedData = null; // { byDate: { "YYYY-MM-DD": { main, sub, projects: Set } } }
+
+// ── Process files → build byDate map ─────────────────────────────────────────
+async function processFiles(files) {
+  const byDate = {}; // { date: { main: hours, sub: hours, mainProjs: Set, subProjs: Set } }
+
+  const jsonlFiles = Array.from(files).filter(f => {
+    const p = f.webkitRelativePath || f.name;
+    return p.endsWith('.jsonl') && p.includes('/projects/');
+  });
+
+  for (const file of jsonlFiles) {
+    const p = file.webkitRelativePath || file.name;
+    const isSub = p.includes('/subagents/');
+    const parts = p.split('/');
+    // Path: .claude/projects/<dir>/.../<file>.jsonl
+    const projIdx = parts.indexOf('projects');
+    const dirName = projIdx >= 0 ? parts[projIdx + 1] : '';
+    const projName = cleanProjectName(dirName);
+
+    const times = await readFirstLast(file);
+    if (!times) continue;
+
+    const startDate = toLocalDate(new Date(times.first));
+    const endDate = toLocalDate(new Date(times.last));
+    // Sessions same-day or spanning midnight: credit to start date
+    const date = startDate;
+    const durationH = (times.last - times.first) / 3600000;
+    const clampedH = Math.max(0, Math.min(durationH, 24));
+
+    if (!byDate[date]) byDate[date] = { main: 0, sub: 0, mainProjs: new Set(), subProjs: new Set() };
+    if (isSub) {
+      byDate[date].sub += clampedH;
+      if (projName) byDate[date].subProjs.add(projName);
+    } else {
+      byDate[date].main += clampedH;
+      if (projName) byDate[date].mainProjs.add(projName);
+    }
+  }
+
+  return byDate;
+}
+
+// ── Generate tweet text ───────────────────────────────────────────────────────
+function generateTweet(date, dayData, projects, isGhostDay) {
+  if (!isGhostDay) return null;
+  const projList = projects.slice(0, 3).join(', ');
+  const moreCount = projects.length - 3;
+  const projStr = projects.length === 0 ? '' :
+    (moreCount > 0 ? `Projects: ${projList} +${moreCount} more` : `Projects: ${projList}`);
+
+  return `👻 Ghost Day — my AI worked ${dayData.sub.toFixed(1)}h while I was offline.
+${projStr}
+#ClaudeCode #GhostDay
+https://yurukusa.github.io/cc-daily-report/`;
+}
+
+// ── Render report for a specific date ────────────────────────────────────────
+function renderReport(targetDate, byDate) {
+  const card = document.getElementById('card');
+  const raw = byDate[targetDate];
+  const dayData = raw
+    ? { main: raw.main, sub: raw.sub }
+    : { main: 0, sub: 0 };
+
+  const isGhostDay = dayData.main === 0 && dayData.sub > 0;
+  const isBothActive = dayData.main > 0 && dayData.sub > 0;
+  const isYouOnly = dayData.main > 0 && dayData.sub === 0;
+  const isInactive = dayData.main === 0 && dayData.sub === 0;
+
+  let statusClass, statusLabel;
+  if (isGhostDay) { statusClass = 'ghost'; statusLabel = '👻 Ghost Day'; }
+  else if (isBothActive) { statusClass = 'both'; statusLabel = '🤝 Both Active'; }
+  else if (isYouOnly) { statusClass = 'you-only'; statusLabel = '👤 You Only'; }
+  else { statusClass = 'inactive'; statusLabel = '😴 No Activity'; }
+
+  const maxH = Math.max(dayData.main, dayData.sub, 1);
+  const youPct = Math.round((dayData.main / maxH) * 100);
+  const aiPct = Math.round((dayData.sub / maxH) * 100);
+
+  // Collect projects from all active sessions that day
+  const allProjects = new Set([
+    ...(raw?.mainProjs || []),
+    ...(raw?.subProjs || [])
+  ]);
+  const projectList = Array.from(allProjects).sort();
+
+  const tweet = generateTweet(targetDate, dayData, projectList, isGhostDay);
+  const twitterLen = tweet ? tweet.replace(/https?:\/\/\S+/g, '                       ').length : 0;
+
+  card.innerHTML = `
+    <div style="font-family:monospace;font-size:0.75rem;color:#8b949e;margin-bottom:12px;">${fmtDate(targetDate)}</div>
+    <div class="status-badge ${statusClass}">${statusLabel}</div>
+
+    <div class="row">
+      <div class="row-label">You (interactive)</div>
+      <div class="bar-wrap">
+        <div class="bar-track"><div class="bar-fill bar-you" style="width:${youPct}%"></div></div>
+        <span class="bar-hours" style="color:#56d364">${dayData.main.toFixed(1)}h</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="row-label">AI (autonomous)</div>
+      <div class="bar-wrap">
+        <div class="bar-track"><div class="bar-fill bar-ai" style="width:${aiPct}%"></div></div>
+        <span class="bar-hours" style="color:#79c0ff">${dayData.sub.toFixed(1)}h</span>
+      </div>
+    </div>
+
+    ${projectList.length > 0 ? `
+    <div class="projects-section">
+      <div class="section-label">Active Projects</div>
+      ${projectList.map(p => `<span class="project-pill">${p}</span>`).join('')}
+    </div>
+    ` : ''}
+
+    ${tweet ? `
+    <div class="tweet-section">
+      <div class="section-label" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>👻 Ghost Day Tweet</span>
+        <span style="font-size:0.75rem;color:${twitterLen <= 280 ? '#56d364' : '#f85149'}">${twitterLen}/280</span>
+      </div>
+      <div class="tweet-box" id="tweetText">${tweet}</div>
+      <div class="tweet-meta">
+        <span>${twitterLen <= 280 ? '✓ Within limit' : '✗ Too long'}</span>
+        <button class="copy-btn" onclick="copyTweet()">Copy</button>
+      </div>
+    </div>
+    ` : ''}
+  `;
+}
+
+function copyTweet() {
+  const text = document.getElementById('tweetText')?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 1500); }
+  });
+}
+
+// ── Main flow ─────────────────────────────────────────────────────────────────
+const dateInput = document.getElementById('dateInput');
+const fileInput = document.getElementById('fileInput');
+const dateNav = document.getElementById('dateNav');
+const dateDisplay = document.getElementById('dateDisplay');
+
+// Set default date to yesterday
+dateInput.value = yesterday();
+dateInput.max = toLocalDate(new Date());
+
+dateInput.addEventListener('change', () => {
+  if (_cachedData) renderReport(dateInput.value, _cachedData);
+});
+
+document.getElementById('prevDay').addEventListener('click', () => {
+  const prev = addDays(dateInput.value, -1);
+  dateInput.value = prev;
+  if (_cachedData) renderReport(prev, _cachedData);
+  dateDisplay.textContent = fmtDate(prev);
+});
+
+document.getElementById('nextDay').addEventListener('click', () => {
+  const next = addDays(dateInput.value, 1);
+  if (next <= toLocalDate(new Date())) {
+    dateInput.value = next;
+    if (_cachedData) renderReport(next, _cachedData);
+    dateDisplay.textContent = fmtDate(next);
+  }
+});
+
+fileInput.addEventListener('change', async (e) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  document.getElementById('card').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">⏳</div>
+      <p>Reading ${files.length} files…</p>
+    </div>`;
+
+  try {
+    const byDate = await processFiles(files);
+    _cachedData = byDate;
+    const targetDate = dateInput.value;
+    renderReport(targetDate, byDate);
+    dateNav.style.display = 'flex';
+    dateDisplay.textContent = fmtDate(targetDate);
+  } catch (err) {
+    document.getElementById('card').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">⚠️</div>
+        <p>Error reading files: ${err.message}</p>
+      </div>`;
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{
+  "name": "@yurukusa/cc-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for cc-toolkit — gives Claude real-time access to your Claude Code usage stats",
+  "type": "module",
+  "bin": {
+    "cc-mcp": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "claude-code",
+    "ai",
+    "productivity",
+    "cli",
+    "cc-toolkit"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yurukusa/cc-mcp.git"
+  },
+  "homepage": "https://yurukusa.github.io/cc-toolkit/",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1"
+  }
+}

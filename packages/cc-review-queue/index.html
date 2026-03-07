@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>cc-review-queue — AI Review Queue</title>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
+      --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+      --orange: #f0883e; --red: #f85149; --green: #3fb950;
+      --blue: #58a6ff; --yellow: #d29922; --purple: #d2a8ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: ui-monospace,monospace; font-size: 13px; line-height: 1.5; min-height: 100vh; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 16px; color: var(--text); }
+    header .badge { background: var(--red); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .main { padding: 20px; max-width: 960px; margin: 0 auto; }
+
+    /* drop zone */
+    .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; margin-bottom: 20px; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: var(--orange); background: rgba(240,136,62,.05); }
+    .drop-zone input { display: none; }
+    .drop-zone h2 { font-size: 15px; margin-bottom: 8px; color: var(--text); }
+    .drop-zone p { color: var(--muted); font-size: 12px; }
+    .drop-zone .icon { font-size: 32px; margin-bottom: 12px; }
+
+    /* controls */
+    .controls { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .controls label { color: var(--muted); font-size: 12px; }
+    .period-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .period-btn.active { background: var(--orange); border-color: var(--orange); color: #fff; }
+    .top-input { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; width: 60px; font-size: 12px; font-family: inherit; }
+    .summary { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; display: flex; gap: 24px; flex-wrap: wrap; }
+    .summary .stat { }
+    .summary .stat .val { font-size: 18px; font-weight: 700; color: var(--orange); }
+    .summary .stat .lbl { font-size: 11px; color: var(--muted); }
+
+    /* table */
+    .queue-table { width: 100%; border-collapse: collapse; }
+    .queue-table th { background: var(--surface); border: 1px solid var(--border); padding: 8px 10px; text-align: left; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .queue-table td { border: 1px solid var(--border); padding: 8px 10px; vertical-align: top; }
+    .queue-table tr:hover td { background: rgba(255,255,255,.02); }
+    .queue-table .num { color: var(--muted); }
+    .path-cell { max-width: 420px; }
+    .path-full { color: var(--blue); word-break: break-all; font-size: 12px; }
+    .path-short { color: var(--text); }
+    .tool-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+    .tool-Write { background: rgba(59,185,80,.15); color: var(--green); border: 1px solid rgba(59,185,80,.3); }
+    .tool-Edit  { background: rgba(240,136,62,.15); color: var(--orange); border: 1px solid rgba(240,136,62,.3); }
+    .tool-Bash  { background: rgba(88,166,255,.15); color: var(--blue); border: 1px solid rgba(88,166,255,.3); }
+    .diff { font-size: 11px; }
+    .diff .add { color: var(--green); }
+    .diff .del { color: var(--red); }
+    .date-cell { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .edits-cell { color: var(--muted); font-size: 11px; text-align: center; }
+
+    /* sensitive path highlight */
+    .sensitive { background: rgba(248,81,73,.05) !important; }
+    .sensitive td:first-child { border-left: 2px solid var(--red); }
+
+    .no-data { text-align: center; padding: 40px; color: var(--muted); }
+    .error { background: rgba(248,81,73,.1); border: 1px solid rgba(248,81,73,.3); border-radius: 6px; padding: 12px; color: var(--red); margin-bottom: 16px; font-size: 12px; }
+    .reload-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; margin-left: auto; }
+
+    .legend { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+    .sensitive-dot { background: rgba(248,81,73,.4); border: 1px solid var(--red); }
+    .normal-dot { background: var(--surface2); border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>📋 cc-review-queue</h1>
+  <span class="badge">AI Review</span>
+</header>
+<div class="main">
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".jsonl,.json,.log,text/plain">
+    <div class="icon">📂</div>
+    <h2>Select your activity-log.jsonl</h2>
+    <p>Click to select file — usually at <code>~/ops/activity-log.jsonl</code><br>
+    Processed entirely in your browser. Nothing is uploaded.</p>
+  </div>
+
+  <div id="output" style="display:none">
+    <div class="controls">
+      <span id="fileLabel" style="color:var(--muted);font-size:12px;"></span>
+      <span class="controls" style="margin-bottom:0;gap:6px">
+        <label>Period:</label>
+        <button class="period-btn" data-d="7">7d</button>
+        <button class="period-btn active" data-d="30">30d</button>
+        <button class="period-btn" data-d="90">90d</button>
+        <button class="period-btn" data-d="0">All</button>
+      </span>
+      <span style="display:flex;align-items:center;gap:5px;">
+        <label>Top:</label>
+        <input type="number" class="top-input" id="topInput" value="30" min="1" max="500">
+      </span>
+      <button class="reload-btn" id="clearBtn">✕ Clear</button>
+    </div>
+
+    <div class="summary" id="summary"></div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot sensitive-dot"></div>Sensitive path (~/.claude/, ~/bin/, config)</div>
+      <div class="legend-item"><div class="legend-dot normal-dot"></div>Normal path</div>
+    </div>
+
+    <div id="error" class="error" style="display:none"></div>
+    <table class="queue-table" id="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>File</th>
+          <th>Tool</th>
+          <th>Diff</th>
+          <th>Edits</th>
+          <th>Last changed</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="noData" class="no-data" style="display:none">✓ No items pending review for this period.</div>
+  </div>
+</div>
+
+<script>
+  const SENSITIVE_PATTERNS = [
+    /\/\.claude\//,/\/bin\//,/\.claude$/,/config/i,/credentials/i,/secrets/i,
+    /\.env/,/hooks\//,/CLAUDE\.md$/,/settings\.json$/,/keybindings/
+  ];
+
+  function isSensitive(path) {
+    return SENSITIVE_PATTERNS.some(re => re.test(path));
+  }
+
+  function shortPath(p) {
+    return p.replace(/^\/home\/[^\/]+\//, '~/').replace(/^\/Users\/[^\/]+\//, '~/');
+  }
+
+  function fmtDate(ts) {
+    const d = new Date(typeof ts === 'number' ? ts * 1000 : ts);
+    if (isNaN(d)) return '—';
+    const now = new Date();
+    const diff = now - d;
+    const m = 60000, h = 3600000, day = 86400000;
+    if (diff < m) return 'just now';
+    if (diff < h) return Math.floor(diff/m) + 'm ago';
+    if (diff < day) return Math.floor(diff/h) + 'h ago';
+    if (diff < 7*day) return Math.floor(diff/day) + 'd ago';
+    return d.toISOString().slice(0,10);
+  }
+
+  function fmtDateFull(ts) {
+    const d = new Date(typeof ts === 'number' ? ts * 1000 : ts);
+    if (isNaN(d)) return '—';
+    return d.toISOString().slice(0,16).replace('T',' ');
+  }
+
+  let allEntries = [];
+  let days = 30;
+  let top = 30;
+
+  function parseLog(text) {
+    const lines = text.trim().split('\n').filter(Boolean);
+    const out = [];
+    for (const line of lines) {
+      try {
+        const e = JSON.parse(line);
+        if (e.needs_review === true) out.push(e);
+      } catch {}
+    }
+    return out;
+  }
+
+  function render() {
+    const cutoff = days === 0 ? 0 : Date.now() - days * 86400000;
+    const filtered = allEntries.filter(e => {
+      const ts = e.ts_epoch ? e.ts_epoch * 1000 : new Date(e.ts).getTime();
+      return days === 0 || ts >= cutoff;
+    });
+
+    // Group by path
+    const byPath = new Map();
+    for (const e of filtered) {
+      const path = e.path || e.file || '(unknown)';
+      const ts = e.ts_epoch ? e.ts_epoch * 1000 : new Date(e.ts).getTime();
+      if (!byPath.has(path)) {
+        byPath.set(path, { path, tool: e.tool, lastTs: ts, lastRaw: e.ts || e.ts_epoch, totalAdd: 0, totalDel: 0, count: 0 });
+      }
+      const r = byPath.get(path);
+      if (ts > r.lastTs) { r.lastTs = ts; r.lastRaw = e.ts || e.ts_epoch; r.tool = e.tool; }
+      r.totalAdd += (e.add || 0);
+      r.totalDel += (e.del || 0);
+      r.count++;
+    }
+
+    const rows = [...byPath.values()].sort((a,b) => b.lastTs - a.lastTs).slice(0, top);
+    const totalEdits = filtered.length;
+    const totalAdd = filtered.reduce((s,e) => s+(e.add||0), 0);
+    const totalDel = filtered.reduce((s,e) => s+(e.del||0), 0);
+
+    // Summary
+    const period = days === 0 ? 'all time' : `last ${days} days`;
+    document.getElementById('summary').innerHTML = `
+      <div class="stat"><div class="val">${rows.length}</div><div class="lbl">files pending review</div></div>
+      <div class="stat"><div class="val">${totalEdits}</div><div class="lbl">total edits (${period})</div></div>
+      <div class="stat"><div class="val" style="color:var(--green)">+${totalAdd.toLocaleString()}</div><div class="lbl">lines added</div></div>
+      <div class="stat"><div class="val" style="color:var(--red)">-${totalDel.toLocaleString()}</div><div class="lbl">lines deleted</div></div>
+    `;
+
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+
+    if (rows.length === 0) {
+      document.getElementById('noData').style.display = 'block';
+      document.getElementById('table').style.display = 'none';
+      return;
+    }
+    document.getElementById('noData').style.display = 'none';
+    document.getElementById('table').style.display = 'table';
+
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      const sens = isSensitive(r.path);
+      if (sens) tr.classList.add('sensitive');
+      const toolClass = `tool-${r.tool}` || 'tool-Edit';
+      const short = shortPath(r.path);
+      tr.innerHTML = `
+        <td class="num">${i+1}</td>
+        <td class="path-cell">
+          <div class="path-short">${escHtml(short.split('/').pop())}</div>
+          <div class="path-full">${escHtml(short)}</div>
+        </td>
+        <td><span class="tool-badge ${toolClass}">${escHtml(r.tool||'?')}</span></td>
+        <td class="diff">
+          ${r.totalAdd ? `<span class="add">+${r.totalAdd}</span>` : ''}
+          ${r.totalDel ? `<span class="del"> -${r.totalDel}</span>` : ''}
+          ${!r.totalAdd && !r.totalDel ? '<span style="color:var(--muted)">—</span>' : ''}
+        </td>
+        <td class="edits-cell">${r.count}×</td>
+        <td class="date-cell" title="${fmtDateFull(r.lastRaw)}">${fmtDate(r.lastTs)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function loadFile(file) {
+    if (!file) return;
+    document.getElementById('fileLabel').textContent = `📁 ${file.name} (${(file.size/1024).toFixed(0)} KB)`;
+    const reader = new FileReader();
+    reader.onload = e => {
+      allEntries = parseLog(e.target.result);
+      document.getElementById('dropZone').style.display = 'none';
+      document.getElementById('output').style.display = 'block';
+      render();
+    };
+    reader.readAsText(file);
+  }
+
+  // Drop zone
+  const dz = document.getElementById('dropZone');
+  const fi = document.getElementById('fileInput');
+  dz.addEventListener('click', () => fi.click());
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+  fi.addEventListener('change', () => fi.files[0] && loadFile(fi.files[0]));
+
+  // Period buttons
+  document.querySelectorAll('.period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      days = parseInt(btn.dataset.d);
+      render();
+    });
+  });
+
+  // Top input
+  document.getElementById('topInput').addEventListener('change', e => {
+    top = Math.max(1, parseInt(e.target.value) || 30);
+    render();
+  });
+
+  // Clear
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    allEntries = [];
+    document.getElementById('dropZone').style.display = 'block';
+    document.getElementById('output').style.display = 'none';
+  });
+</script>
+</body>
+</html>

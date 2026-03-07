@@ -1,0 +1,38 @@
+{
+  "name": "@yurukusa/cc-stats-badge",
+  "version": "1.0.1",
+  "description": "Generate a Claude Code stats badge for your GitHub README — streak, hours, autonomy ratio",
+  "type": "module",
+  "bin": {
+    "cc-stats-badge": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "productivity",
+    "badge",
+    "svg",
+    "github",
+    "readme",
+    "cli",
+    "cc-toolkit"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yurukusa/cc-stats-badge.git"
+  },
+  "homepage": "https://yurukusa.github.io/cc-toolkit/",
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "cc-agent-load": ">=1.0.0"
+  }
+}

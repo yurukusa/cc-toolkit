@@ -1,0 +1,21 @@
+{
+  "name": "cc-toolkit",
+  "version": "1.0.0",
+  "description": "35 zero-dependency CLI tools for Claude Code analytics, safety, reporting, and more",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-toolkit"
+  },
+  "keywords": [
+    "claude-code",
+    "cli",
+    "developer-tools",
+    "analytics",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=18"
+  }
+}

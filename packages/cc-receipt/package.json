@@ -1,0 +1,36 @@
+{
+  "name": "cc-receipt",
+  "version": "1.0.0",
+  "description": "ASCII receipt of your AI's daily work from Claude Code proof-log. The AI never clocks out.",
+  "type": "module",
+  "bin": {
+    "cc-receipt": "cli.mjs"
+  },
+  "scripts": {
+    "prepublishOnly": "node --check cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude-code",
+    "ai",
+    "receipt",
+    "proof-log",
+    "cli",
+    "productivity",
+    "ascii"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-receipt"
+  },
+  "homepage": "https://github.com/yurukusa/cc-receipt"
+}

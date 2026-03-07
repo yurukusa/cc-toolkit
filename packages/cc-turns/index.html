@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cc-turns — User Turn Count per Claude Code Session</title>
+<meta name="description" content="28% of Claude Code sessions are fire-and-forget (1 user message). 42% have 2-3 turns. 15+ turn sessions average 182 tool calls. Analyze your collaboration patterns.">
+<meta property="og:title" content="cc-turns — How Many Times Do You Intervene?">
+<meta property="og:description" content="28% fire-and-forget. 42% need 2-3 turns. Median: 3 user messages per session. More turns = exponentially more tools.">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+.hero{background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);border-bottom:1px solid #21262d;padding:48px 24px 40px;text-align:center}
+.hero h1{font-size:2.2rem;font-weight:700;color:#f0f6fc;letter-spacing:-0.5px}
+.hero h1 span{color:#58d8f0}
+.hero p{color:#8b949e;margin-top:10px;font-size:1.05rem;max-width:540px;margin-inline:auto}
+.cmd{display:inline-block;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 18px;font-family:monospace;font-size:1rem;color:#79c0ff;margin-top:18px}
+.drop-zone{border:2px dashed #30363d;border-radius:12px;padding:32px;margin:28px auto;max-width:500px;text-align:center;cursor:pointer;transition:.2s;color:#8b949e;font-size:.95rem}
+.drop-zone:hover,.drop-zone.drag{border-color:#58d8f0;color:#58d8f0}
+.drop-zone.loaded{border-color:#3fb950;color:#3fb950}
+#status{text-align:center;color:#8b949e;font-size:.9rem;margin-bottom:8px}
+.main{max-width:960px;margin:0 auto;padding:32px 16px}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:24px}
+.stat-box{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:14px 16px;text-align:center}
+.stat-val{font-size:1.7rem;font-weight:700;color:#58d8f0}
+.stat-lbl{font-size:.8rem;color:#8b949e;margin-top:3px}
+
+.card{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:20px;margin-bottom:24px}
+.card-title{font-size:1rem;font-weight:600;color:#f0f6fc;margin-bottom:6px}
+.card-sub{font-size:.82rem;color:#8b949e;margin-bottom:16px}
+
+/* Bracket rows */
+.bk-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.bk-label{width:82px;font-size:.84rem;font-family:monospace;color:#8b949e;text-align:right;flex-shrink:0}
+.bk-track{flex:1;background:#21262d;border-radius:4px;height:28px;overflow:hidden;position:relative}
+.bk-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.bk-info{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.76rem;font-family:monospace;color:#e6edf3;white-space:nowrap}
+
+/* Correlation chart */
+.corr-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.corr-label{width:82px;font-size:.82rem;font-family:monospace;color:#8b949e;text-align:right}
+.corr-track{flex:1;background:#21262d;border-radius:4px;height:22px;overflow:hidden;position:relative}
+.corr-fill{height:100%;background:linear-gradient(90deg,#58d8f0,#a371f7);border-radius:4px;transition:width .5s ease}
+.corr-val{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.76rem;font-family:monospace;color:#e6edf3}
+
+/* Insight */
+.insight ul{list-style:none;display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.insight li{font-size:.88rem;color:#8b949e;padding-left:18px;position:relative;line-height:1.5}
+.insight li::before{content:'→';position:absolute;left:0;color:#58d8f0}
+.insight li strong{color:#e6edf3}
+
+.footer{text-align:center;padding:32px 16px;color:#8b949e;font-size:.85rem;border-top:1px solid #21262d;margin-top:16px}
+.footer a{color:#58a6ff;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>cc-<span>turns</span></h1>
+  <p>How many times do you step in per session? 28% are fire-and-forget. 42% need 2–3 turns. Sessions with 15+ turns average 182 tool calls.</p>
+  <div class="cmd">npx cc-turns</div>
+</div>
+
+<div class="main">
+  <div class="drop-zone" id="dropZone">
+    <div>📁 Drop your <code>~/.claude/projects/</code> folder here</div>
+    <div style="margin-top:6px;font-size:.82rem">or click to select</div>
+    <input type="file" id="fileInput" webkitdirectory style="display:none">
+  </div>
+  <div id="status">No data loaded — showing sample data from 1,835 sessions</div>
+  <div id="results"></div>
+</div>
+
+<div class="footer">
+  Part of <a href="https://yurukusa.github.io/cc-toolkit/">cc-toolkit</a> — 91 tools for Claude Code &nbsp;|&nbsp;
+  <a href="https://github.com/yurukusa/cc-turns">GitHub</a> &nbsp;|&nbsp;
+  <a href="https://www.npmjs.com/package/cc-turns">npm</a>
+</div>
+
+<script>
+const SAMPLE = {
+  sessions: 1835,
+  fireAndForgetRate: 28.3,
+  userTurnStats: { median: 3, mean: 4.2, p90: 11, p10: 1 },
+  bracketData: [
+    { key: '1',    label: '1 turn',    count: 519,  pct: 28.3, avgTools: 18.4, color: '#58d8f0' },
+    { key: '2-3',  label: '2–3 turns', count: 784,  pct: 42.7, avgTools: 32.6, color: '#79c0ff' },
+    { key: '4-7',  label: '4–7 turns', count: 312,  pct: 17.0, avgTools: 58.4, color: '#a371f7' },
+    { key: '8-14', label: '8–14 turns',count: 148,  pct:  8.1, avgTools: 94.7, color: '#e3b341' },
+    { key: '15+',  label: '15+ turns', count:  72,  pct:  4.3, avgTools: 182.3,color: '#f85149' },
+  ],
+};
+
+const INSIGHTS = [
+  '<strong>28% of sessions are fire-and-forget</strong> — one message, Claude executes everything. No correction, no clarification needed.',
+  '<strong>42% have 2–3 user turns</strong> — the most common pattern. A quick check-in or clarification, then Claude finishes the work.',
+  '<strong>Tool count scales with interventions</strong> — 1-turn sessions average 18 tools; 15+ turn sessions average 182. Complexity compounds.',
+  '<strong>Median is just 3 turns</strong> — most Claude Code work is brief and targeted, not long autonomous marathons.',
+  '<strong>p90 is 11 turns</strong> — only 10% of sessions need more than 11 user messages. Rare but tool-heavy when they happen.',
+];
+
+function renderAll(d) {
+  const { sessions, fireAndForgetRate, userTurnStats, bracketData } = d;
+  const maxCount = Math.max(...bracketData.map(b => b.count));
+  const maxAvgTools = Math.max(...bracketData.map(b => b.avgTools));
+
+  const bkHtml = bracketData.map(b => {
+    const w = maxCount > 0 ? (b.count / maxCount * 100).toFixed(1) : 0;
+    return `<div class="bk-row">
+      <div class="bk-label">${b.label}</div>
+      <div class="bk-track">
+        <div class="bk-fill" style="width:${w}%;background:${b.color}"></div>
+        <div class="bk-info">${b.count.toLocaleString()} (${b.pct}%) · avg ${b.avgTools} tools</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const corrHtml = bracketData.map(b => {
+    const w = maxAvgTools > 0 ? (b.avgTools / maxAvgTools * 100).toFixed(1) : 0;
+    return `<div class="corr-row">
+      <div class="corr-label">${b.key}</div>
+      <div class="corr-track">
+        <div class="corr-fill" style="width:${w}%"></div>
+        <div class="corr-val">${b.avgTools} tool calls</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const insHtml = INSIGHTS.map(i => `<li>${i}</li>`).join('');
+
+  document.getElementById('results').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">${fireAndForgetRate}%</div><div class="stat-lbl">fire-and-forget rate</div></div>
+      <div class="stat-box"><div class="stat-val">${userTurnStats.median}</div><div class="stat-lbl">median user turns</div></div>
+      <div class="stat-box"><div class="stat-val">${userTurnStats.mean}</div><div class="stat-lbl">mean user turns</div></div>
+      <div class="stat-box"><div class="stat-val">${userTurnStats.p90}</div><div class="stat-lbl">p90 user turns</div></div>
+    </div>
+    <div class="card insight">
+      <div class="card-title">Key findings — ${sessions.toLocaleString()} sessions analyzed</div>
+      <ul>${insHtml}</ul>
+    </div>
+    <div class="card">
+      <div class="card-title">User Turn Distribution</div>
+      <div class="card-sub">How many times did the user send a message? Includes avg tool calls per bracket.</div>
+      ${bkHtml}
+    </div>
+    <div class="card">
+      <div class="card-title">User Turns → Tool Calls</div>
+      <div class="card-sub">More interventions = exponentially more tool calls per session</div>
+      ${corrHtml}
+    </div>`;
+}
+
+// ── JSONL parsing ─────────────────────────────────────────────────
+async function processFiles(files) {
+  const jsonlFiles = [...files].filter(f => f.name.endsWith('.jsonl'));
+  document.getElementById('status').textContent = `Processing ${jsonlFiles.length} session files…`;
+
+  const BRACKETS_DEF = [
+    { key:'1', min:1, max:1 }, { key:'2-3', min:2, max:3 },
+    { key:'4-7', min:4, max:7 }, { key:'8-14', min:8, max:14 },
+    { key:'15+', min:15, max:Infinity },
+  ];
+  const BRACKET_META = [
+    { key:'1', label:'1 turn', color:'#58d8f0' },
+    { key:'2-3', label:'2–3 turns', color:'#79c0ff' },
+    { key:'4-7', label:'4–7 turns', color:'#a371f7' },
+    { key:'8-14', label:'8–14 turns', color:'#e3b341' },
+    { key:'15+', label:'15+ turns', color:'#f85149' },
+  ];
+
+  const bkCounts = {}; const bkTools = {};
+  BRACKETS_DEF.forEach(b => { bkCounts[b.key]=0; bkTools[b.key]={tools:0,sessions:0}; });
+  const userTurnsList = [];
+  let sessions=0, singleTurn=0;
+
+  for (const file of jsonlFiles) {
+    const text = await file.text();
+    let userTurns=0, totalTools=0;
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      try {
+        const obj = JSON.parse(line);
+        const msg = obj.message || obj;
+        const role = msg.role || obj.type;
+        if (role==='user') userTurns++;
+        else if (role==='assistant') {
+          const content = msg.content;
+          if (Array.isArray(content)) {
+            totalTools += content.filter(b=>b.type==='tool_use').length;
+          }
+        }
+      } catch {}
+    }
+    if (totalTools < 3) continue;
+    sessions++;
+    userTurnsList.push(userTurns);
+    if (userTurns===1) singleTurn++;
+    const bk = BRACKETS_DEF.find(b=>userTurns>=b.min&&userTurns<=b.max)?.key||'15+';
+    bkCounts[bk]++;
+    bkTools[bk].tools+=totalTools;
+    bkTools[bk].sessions++;
+  }
+
+  const sorted = [...userTurnsList].sort((a,b)=>a-b);
+  const median = sorted[Math.floor(sorted.length*0.5)]||1;
+  const p90 = sorted[Math.floor(sorted.length*0.9)]||1;
+  const mean = +(userTurnsList.reduce((a,b)=>a+b,0)/userTurnsList.length).toFixed(1);
+
+  const bracketData = BRACKET_META.map(m => ({
+    ...m,
+    count: bkCounts[m.key],
+    pct: +(bkCounts[m.key]/sessions*100).toFixed(1),
+    avgTools: bkTools[m.key].sessions>0 ? +(bkTools[m.key].tools/bkTools[m.key].sessions).toFixed(1) : 0,
+  }));
+
+  document.getElementById('status').textContent = `Analyzed ${sessions.toLocaleString()} sessions`;
+  renderAll({
+    sessions,
+    fireAndForgetRate: +(singleTurn/sessions*100).toFixed(1),
+    userTurnStats: { median, mean, p90, p10: sorted[Math.floor(sorted.length*0.1)]||1 },
+    bracketData,
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+renderAll(SAMPLE);
+
+const dz = document.getElementById('dropZone');
+const fi = document.getElementById('fileInput');
+dz.addEventListener('click', () => fi.click());
+fi.addEventListener('change', () => { if (fi.files.length) processFiles(fi.files); });
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const allFiles = [];
+  let pending = 0;
+  function traverse(entry) {
+    if (entry.isFile) {
+      pending++;
+      entry.file(f => { allFiles.push(f); if (--pending === 0) processFiles(allFiles); });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      function readAll() { reader.readEntries(entries => { if (!entries.length) return; entries.forEach(traverse); readAll(); }); }
+      readAll();
+    }
+  }
+  for (const item of e.dataTransfer.items) { const e2 = item.webkitGetAsEntry(); if (e2) traverse(e2); }
+  dz.classList.add('loaded');
+  dz.querySelector('div').textContent = '✓ Loading your data…';
+});
+</script>
+</body>
+</html>

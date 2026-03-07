@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cc-personality — What kind of Claude Code developer are you?</title>
+  <meta name="description" content="Diagnose your Claude Code developer archetype from real usage patterns. Paste your JSON data and find out.">
+  <meta property="og:title" content="cc-personality — What kind of Claude Code developer are you?">
+  <meta property="og:description" content="10 archetypes. Real data. No fluff.">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --cyan: #58d8f0;
+      --yellow: #f7c948;
+      --blue: #58a6ff;
+      --green: #56d364;
+      --orange: #ffa657;
+      --red: #ff7b72;
+      --purple: #bc8cff;
+      --pink: #f778ba;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+    .container { max-width: 720px; margin: 0 auto; padding: 40px 20px; }
+    header { text-align: center; margin-bottom: 48px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: var(--cyan); margin-bottom: 8px; }
+    header p { color: var(--muted); font-size: 1rem; }
+    .step-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .step-box h2 { font-size: 1rem; font-weight: 600; margin-bottom: 12px; color: var(--cyan); }
+    code {
+      background: #010409;
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      border-radius: 8px;
+      display: block;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 0.9rem;
+      color: var(--green);
+      margin-bottom: 8px;
+    }
+    .copy-hint { font-size: 0.8rem; color: var(--muted); }
+    textarea {
+      width: 100%;
+      height: 120px;
+      background: #010409;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      color: var(--text);
+      font-family: monospace;
+      font-size: 0.85rem;
+      resize: vertical;
+    }
+    textarea:focus { outline: none; border-color: var(--cyan); }
+    button {
+      background: var(--cyan);
+      color: #0d1117;
+      border: none;
+      padding: 12px 32px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: opacity 0.15s;
+    }
+    button:hover { opacity: 0.85; }
+    #result { display: none; }
+    .archetype-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .archetype-name { font-size: 2rem; font-weight: 700; color: var(--yellow); margin-bottom: 4px; }
+    .archetype-jp { font-size: 1rem; color: var(--muted); margin-bottom: 16px; }
+    .tagline { font-size: 1.1rem; color: var(--cyan); font-style: italic; margin-bottom: 12px; }
+    .description { color: var(--text); font-size: 0.95rem; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-val { font-size: 1.6rem; font-weight: 700; color: var(--cyan); }
+    .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .heatmap-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .heatmap-box h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 12px; }
+    .heatmap {
+      display: flex;
+      gap: 3px;
+      align-items: flex-end;
+      height: 60px;
+    }
+    .heatmap-bar {
+      flex: 1;
+      background: var(--border);
+      border-radius: 2px 2px 0 0;
+      min-height: 2px;
+      transition: opacity 0.1s;
+      position: relative;
+    }
+    .heatmap-bar.peak { background: var(--yellow); }
+    .heatmap-bar.night { background: var(--blue); opacity: 0.6; }
+    .heatmap-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .share-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    .share-box h3 { margin-bottom: 12px; color: var(--muted); font-size: 0.9rem; }
+    .share-btn {
+      background: #000;
+      color: #fff;
+      border: 1px solid #fff;
+      padding: 10px 24px;
+      border-radius: 24px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .share-btn:hover { background: #111; }
+    .error-msg { color: var(--red); font-size: 0.9rem; margin-top: 8px; display: none; }
+    .archetypes-list {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-top: 24px;
+    }
+    .archetypes-list h3 { font-size: 1rem; color: var(--muted); margin-bottom: 16px; }
+    .archetype-row {
+      display: flex;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+    .archetype-row:last-child { border-bottom: none; }
+    .archetype-row .emoji { font-size: 1.2rem; min-width: 28px; }
+    .archetype-row .name { font-weight: 600; color: var(--text); min-width: 200px; }
+    .archetype-row .trigger { color: var(--muted); font-size: 0.8rem; }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin-top: 48px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--cyan); text-decoration: none; }
+    @media (max-width: 480px) {
+      header h1 { font-size: 1.5rem; }
+      .archetype-name { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>cc-personality</h1>
+    <p>What kind of Claude Code developer are you?<br>Diagnose your archetype from real usage data.</p>
+  </header>
+
+  <div class="step-box">
+    <h2>Step 1 — Generate your data</h2>
+    <code>npx cc-personality --json</code>
+    <p class="copy-hint">Run this in your terminal. Copy the entire JSON output.</p>
+  </div>
+
+  <div class="step-box">
+    <h2>Step 2 — Paste your JSON</h2>
+    <textarea id="jsonInput" placeholder='Paste your JSON here...'></textarea>
+    <br>
+    <button onclick="diagnose()">Diagnose my archetype →</button>
+    <p class="error-msg" id="errorMsg"></p>
+  </div>
+
+  <div id="result">
+    <div class="archetype-card" id="archetypeCard">
+      <div class="archetype-name" id="archetypeName"></div>
+      <div class="archetype-jp" id="archetypeJp"></div>
+      <div class="tagline" id="tagline"></div>
+      <div class="description" id="description"></div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-val" id="statHours"></div><div class="stat-label">Total Hours</div></div>
+      <div class="stat-box"><div class="stat-val" id="statSessions"></div><div class="stat-label">Sessions</div></div>
+      <div class="stat-box"><div class="stat-val" id="statDays"></div><div class="stat-label">Active Days</div></div>
+      <div class="stat-box"><div class="stat-val" id="statStreak"></div><div class="stat-label">Longest Streak</div></div>
+      <div class="stat-box"><div class="stat-val" id="statAvg"></div><div class="stat-label">Avg Session</div></div>
+      <div class="stat-box"><div class="stat-val" id="statNight"></div><div class="stat-label">Night Sessions</div></div>
+    </div>
+
+    <div class="heatmap-box">
+      <h3>Activity by hour (0h → 23h)</h3>
+      <div class="heatmap" id="heatmap"></div>
+      <div class="heatmap-labels"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
+    </div>
+
+    <div class="share-box">
+      <h3>Share your archetype</h3>
+      <a id="shareLink" class="share-btn" target="_blank" href="#">Post on X (Twitter)</a>
+    </div>
+  </div>
+
+  <div class="archetypes-list">
+    <h3>All 10 archetypes</h3>
+    <div class="archetype-row"><span class="emoji">🌙</span><span class="name">The Midnight Beast</span><span class="trigger">30%+ sessions midnight–5 AM</span></div>
+    <div class="archetype-row"><span class="emoji">🌅</span><span class="name">The Dawn Coder</span><span class="trigger">40%+ sessions 5–9 AM</span></div>
+    <div class="archetype-row"><span class="emoji">🤖</span><span class="name">The Unstoppable Machine</span><span class="trigger">30+ consecutive active days</span></div>
+    <div class="archetype-row"><span class="emoji">⚔️</span><span class="name">The Weekend Warrior</span><span class="trigger">Weekend sessions 1.8× weekdays</span></div>
+    <div class="archetype-row"><span class="emoji">⚡</span><span class="name">The Burst Genius</span><span class="trigger">Long inactive gaps + intense bursts</span></div>
+    <div class="archetype-row"><span class="emoji">📐</span><span class="name">The Disciplined Architect</span><span class="trigger">Consistent daily usage, no burnout</span></div>
+    <div class="archetype-row"><span class="emoji">🔥</span><span class="name">The Session Monster</span><span class="trigger">Average session over 2.5 hours</span></div>
+    <div class="archetype-row"><span class="emoji">📦</span><span class="name">The Micro-Shipper</span><span class="trigger">15+ sessions per active day</span></div>
+    <div class="archetype-row"><span class="emoji">🗺️</span><span class="name">The Code Explorer</span><span class="trigger">Active across 20+ different projects</span></div>
+    <div class="archetype-row"><span class="emoji">🎯</span><span class="name">The Mono-Focused</span><span class="trigger">100+ sessions, 3 or fewer projects</span></div>
+    <div class="archetype-row"><span class="emoji">⚖️</span><span class="name">The Balanced Developer</span><span class="trigger">None of the above — rare and admirable</span></div>
+  </div>
+
+  <div style="background: var(--surface); border: 1px solid var(--orange); border-radius: 12px; padding: 20px; margin-top: 24px; text-align: center;">
+    <p style="font-size: 0.9rem; color: var(--muted); margin-bottom: 12px;">If you're a <strong style="color: var(--text);">Session Monster or Unstoppable Machine</strong>, you need guardrails. Production Hooks for Claude Code power users.</p>
+    <a href="https://yurukusa.gumroad.com/l/cc-codex-ops-kit" target="_blank"
+       style="display:inline-block; background: var(--orange); color: #0d1117; padding: 10px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 0.9rem;">
+      Claude Code Production Hooks — $4.99 →
+    </a>
+  </div>
+
+  <footer>
+    <p>
+      <a href="https://github.com/yurukusa/cc-personality">GitHub</a> ·
+      <a href="https://www.npmjs.com/package/cc-personality">npm</a> ·
+      Zero dependencies · Reads local files only
+    </p>
+    <p style="margin-top: 8px;">
+      <a href="https://yurukusa.github.io/cc-toolkit/" style="font-weight:600;">All tools: cc-toolkit →</a> ·
+      cc-session-stats · cc-agent-load · cc-ghost-log · cc-wrapped
+    </p>
+  </footer>
+</div>
+
+<script>
+function diagnose() {
+  const raw = document.getElementById('jsonInput').value.trim();
+  const errEl = document.getElementById('errorMsg');
+  errEl.style.display = 'none';
+
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch(e) {
+    errEl.textContent = 'Invalid JSON. Make sure you copied the full output from npx cc-personality --json';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  if (!data.archetype || !data.stats) {
+    errEl.textContent = 'Missing required fields. Run: npx cc-personality --json';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const s = data.stats;
+
+  // Fill archetype card
+  document.getElementById('archetypeName').textContent = data.archetypeName || '';
+  document.getElementById('archetypeJp').textContent = data.archetypeJp ? `「${data.archetypeJp}」` : '';
+  document.getElementById('tagline').textContent = data.tagline || '';
+  document.getElementById('description').textContent = data.description || '';
+
+  // Stats
+  document.getElementById('statHours').textContent = s.totalHours + 'h';
+  document.getElementById('statSessions').textContent = s.totalSessions.toLocaleString();
+  document.getElementById('statDays').textContent = s.activeDays;
+  document.getElementById('statStreak').textContent = s.maxStreak + ' days';
+  document.getElementById('statAvg').textContent = s.avgSessionMinutes + ' min';
+  document.getElementById('statNight').textContent = s.nightPct + '%';
+
+  // Heatmap
+  const heatmap = document.getElementById('heatmap');
+  heatmap.innerHTML = '';
+  if (data.hourBuckets && data.hourBuckets.length === 24) {
+    const max = Math.max(...data.hourBuckets);
+    data.hourBuckets.forEach((v, h) => {
+      const bar = document.createElement('div');
+      bar.className = 'heatmap-bar';
+      if (h === data.peakHour) bar.classList.add('peak');
+      else if (h <= 4 || h >= 22) bar.classList.add('night');
+      bar.style.height = max > 0 ? `${Math.max(4, (v / max) * 100)}%` : '4%';
+      bar.title = `${h}:00 — ${v} sessions`;
+      heatmap.appendChild(bar);
+    });
+  }
+
+  // Share link
+  const shareText = `My Claude Code archetype: ${data.archetypeName} (${data.archetypeJp})\n${s.totalHours}h • ${s.totalSessions} sessions • ${s.maxStreak}-day streak\nWhat's yours? https://yurukusa.github.io/cc-personality/\n#claudecode`;
+  document.getElementById('shareLink').href = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Allow Enter in textarea without submitting (just a UX thing)
+document.getElementById('jsonInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && e.ctrlKey) diagnose();
+});
+</script>
+</body>
+</html>

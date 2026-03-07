@@ -1,0 +1,25 @@
+{
+  "name": "cc-think",
+  "version": "1.0.0",
+  "description": "How deeply does Claude Code think before acting? Thinking block frequency, depth distribution, and hidden reasoning volume.",
+  "type": "module",
+  "bin": {
+    "cc-think": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "developer-tools",
+    "analytics",
+    "thinking"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

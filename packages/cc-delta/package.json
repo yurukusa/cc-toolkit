@@ -1,0 +1,26 @@
+{
+  "name": "cc-delta",
+  "version": "1.0.0",
+  "description": "Analyze Claude Code edit sizes — surgical vs massive changes, expansion ratios, and file type breakdown across all your sessions",
+  "type": "module",
+  "bin": {
+    "cc-delta": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude", "claude-code", "anthropic", "cli", "productivity",
+    "ai", "developer-tools", "session-analysis", "edit", "diff"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-delta"
+  },
+  "homepage": "https://yurukusa.github.io/cc-delta/"
+}

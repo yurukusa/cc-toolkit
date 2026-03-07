@@ -1,0 +1,26 @@
+{
+  "name": "cc-denied",
+  "version": "1.0.0",
+  "description": "Every Bash command your human said NO to. 161 denials. 72% were pkill. One was rm. See what Claude Code tried to run that you stopped.",
+  "type": "module",
+  "bin": {
+    "cc-denied": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude", "claude-code", "anthropic", "cli", "productivity",
+    "ai", "developer-tools", "session-analysis", "denied", "safety"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-denied"
+  },
+  "homepage": "https://yurukusa.github.io/cc-denied/"
+}

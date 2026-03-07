@@ -1,0 +1,31 @@
+{
+  "name": "cc-project-stats",
+  "version": "1.0.0",
+  "description": "Time spent per project in Claude Code — ranked by hours, you vs AI",
+  "type": "module",
+  "bin": {
+    "cc-project-stats": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "productivity",
+    "cli",
+    "cc-toolkit"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yurukusa/cc-project-stats.git"
+  },
+  "homepage": "https://yurukusa.github.io/cc-toolkit/",
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cc-error — Tool Failure Rates in Claude Code</title>
+<meta name="description" content="54% of Claude Code sessions hit at least one error. WebFetch fails 25% of the time. See which tools fail most and how often.">
+<meta property="og:title" content="cc-error — 54% of Claude Code Sessions Hit an Error">
+<meta property="og:description" content="WebFetch fails 25%. Bash fails 6%. Overall 4.5% error rate. See your tool failure patterns.">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+.hero{background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);border-bottom:1px solid #21262d;padding:48px 24px 40px;text-align:center}
+.hero h1{font-size:2.2rem;font-weight:700;color:#f0f6fc;letter-spacing:-0.5px}
+.hero h1 span{color:#f85149}
+.hero p{color:#8b949e;margin-top:10px;font-size:1.05rem;max-width:540px;margin-inline:auto}
+.cmd{display:inline-block;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 18px;font-family:monospace;font-size:1rem;color:#79c0ff;margin-top:18px}
+.drop-zone{border:2px dashed #30363d;border-radius:12px;padding:32px;margin:28px auto;max-width:500px;text-align:center;cursor:pointer;transition:.2s;color:#8b949e;font-size:.95rem}
+.drop-zone:hover,.drop-zone.drag{border-color:#f85149;color:#f85149}
+.drop-zone.loaded{border-color:#3fb950;color:#3fb950}
+#status{text-align:center;color:#8b949e;font-size:.9rem;margin-bottom:8px}
+.main{max-width:900px;margin:0 auto;padding:32px 16px}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+.stat-box{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:14px 16px;text-align:center}
+.stat-val{font-size:1.7rem;font-weight:700;color:#f85149}
+.stat-lbl{font-size:.8rem;color:#8b949e;margin-top:3px}
+
+.card{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:20px;margin-bottom:24px}
+.card-title{font-size:1rem;font-weight:600;color:#f0f6fc;margin-bottom:6px}
+.card-sub{font-size:.82rem;color:#8b949e;margin-bottom:16px}
+
+.err-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.err-tool{width:160px;font-size:.83rem;font-family:monospace;color:#c9d1d9;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.err-track{flex:1;background:#21262d;border-radius:4px;height:26px;position:relative;overflow:hidden}
+.err-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.err-pct{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.76rem;font-family:monospace;color:#e6edf3}
+.err-count{width:90px;font-size:.74rem;color:#484f58;flex-shrink:0;text-align:right;font-family:monospace}
+
+.insight ul{list-style:none;display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.insight li{font-size:.88rem;color:#8b949e;padding-left:18px;position:relative;line-height:1.5}
+.insight li::before{content:'→';position:absolute;left:0;color:#f85149}
+.insight li strong{color:#e6edf3}
+
+.error-callout{background:linear-gradient(135deg,rgba(248,81,73,.1) 0%,rgba(248,81,73,.03) 100%);border:1px solid rgba(248,81,73,.35);border-radius:10px;padding:20px;margin-bottom:24px;text-align:center}
+.error-num{font-size:3.5rem;font-weight:700;color:#f85149;line-height:1}
+.error-label{font-size:.95rem;color:#8b949e;margin-top:8px}
+
+.footer{text-align:center;padding:32px 16px;color:#8b949e;font-size:.85rem;border-top:1px solid #21262d;margin-top:16px}
+.footer a{color:#58a6ff;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>cc-<span>error</span></h1>
+  <p>Which Claude Code tools fail most often? Track error rates across all tool calls to find your weakest links.</p>
+  <div class="cmd">npx cc-error</div>
+</div>
+
+<div class="main">
+  <div class="drop-zone" id="dropZone">
+    Drop your <code>~/.claude/projects/</code> folder here<br>
+    <small style="margin-top:6px;display:block">or click to select</small>
+    <input type="file" id="fileInput" webkitdirectory multiple style="display:none">
+  </div>
+  <div id="status"></div>
+
+  <div id="output" style="display:none">
+    <div class="error-callout" id="errorCallout"></div>
+    <div class="stats-row" id="statsRow"></div>
+    <div class="card" id="toolCard"></div>
+    <div class="card insight" id="insightCard"></div>
+  </div>
+
+  <!-- Default sample data -->
+  <div id="sample">
+    <div class="error-callout">
+      <div class="error-num">54.5%</div>
+      <div class="error-label">of Claude Code sessions hit <strong>at least one error</strong><br><span style="font-size:.85rem">4.5% overall error rate across 143K+ tool calls</span></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">1,977</div><div class="stat-lbl">Sessions</div></div>
+      <div class="stat-box"><div class="stat-val">143K</div><div class="stat-lbl">Tool calls</div></div>
+      <div class="stat-box"><div class="stat-val">6,444</div><div class="stat-lbl">Total errors</div></div>
+      <div class="stat-box"><div class="stat-val">4.5%</div><div class="stat-lbl">Overall error rate</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Error rate by tool</div>
+      <div class="card-sub">Tools with ≥10 calls, ranked by error rate</div>
+      <div class="err-row"><div class="err-tool">WebFetch</div><div class="err-track"><div class="err-fill" style="width:100%;background:#f85149"></div><div class="err-pct">24.8%</div></div><div class="err-count">378/1,523</div></div>
+      <div class="err-row"><div class="err-tool">Bash</div><div class="err-track"><div class="err-fill" style="width:24%;background:#ffa657"></div><div class="err-pct">6.1%</div></div><div class="err-count">3,330/54,519</div></div>
+      <div class="err-row"><div class="err-tool">TaskOutput</div><div class="err-track"><div class="err-fill" style="width:21%;background:#ffa657"></div><div class="err-pct">5.3%</div></div><div class="err-count">44/825</div></div>
+      <div class="err-row"><div class="err-tool">Read</div><div class="err-track"><div class="err-fill" style="width:17%;background:#e3b341"></div><div class="err-pct">4.2%</div></div><div class="err-count">1,544/36,664</div></div>
+      <div class="err-row"><div class="err-tool">Glob</div><div class="err-track"><div class="err-fill" style="width:16%;background:#e3b341"></div><div class="err-pct">3.9%</div></div><div class="err-count">109/2,785</div></div>
+      <div class="err-row"><div class="err-tool">Edit</div><div class="err-track"><div class="err-fill" style="width:14%;background:#3fb950"></div><div class="err-pct">3.5%</div></div><div class="err-count">605/17,310</div></div>
+      <div class="err-row"><div class="err-tool">WebSearch</div><div class="err-track"><div class="err-fill" style="width:14%;background:#3fb950"></div><div class="err-pct">3.5%</div></div><div class="err-count">85/2,443</div></div>
+    </div>
+    <div class="card insight">
+      <div class="card-title">What this means</div>
+      <ul>
+        <li><strong>54% of sessions have ≥1 error</strong> — errors are the norm, not the exception in Claude Code</li>
+        <li><strong>WebFetch fails 25% of the time</strong> — blocked URLs, auth walls, and timeouts hit constantly</li>
+        <li><strong>Bash: 6.1% × 54K calls = 3,300 failures</strong> — commands that exit non-zero, pipes that break</li>
+        <li><strong>Read: 4.2%</strong> — usually reading a file path that doesn't exist yet</li>
+        <li><strong>Edit: 3.5%</strong> — old_string not found in file is the most common cause</li>
+        <li><strong>Claude handles errors gracefully</strong> — 4.5% errors on 143K calls means 1 failure per ~22 tool calls</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Part of <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit</a> —
+  106 free tools for Claude Code users ·
+  <a href="https://github.com/yurukusa/cc-error" target="_blank">GitHub</a>
+</div>
+
+<script>
+const UX_TOOLS = new Set(['ExitPlanMode','AskUserQuestion','EnterPlanMode']);
+const MIN_CALLS = 10;
+
+function processLines(lines) {
+  const toolMap={},toolTotal={},toolErrors={};
+  let totalResults=0,totalErrors=0,sessErrs=0,sessCalls=0;
+  for (const line of lines) {
+    if(!line.includes('"tool_use"')&&!line.includes('"tool_result"')) continue;
+    let obj; try{obj=JSON.parse(line);}catch{continue;}
+    const content=(obj.message||obj).content;
+    if(!Array.isArray(content)) continue;
+    for (const b of content) {
+      if(b.type==='tool_use'&&b.id&&b.name) toolMap[b.id]=b.name;
+      else if(b.type==='tool_result'){
+        const name=toolMap[b.tool_use_id||'']||'unknown';
+        if(UX_TOOLS.has(name)) continue;
+        totalResults++;
+        toolTotal[name]=(toolTotal[name]||0)+1;
+        if(b.is_error){totalErrors++;toolErrors[name]=(toolErrors[name]||0)+1;}
+      }
+    }
+  }
+  const tools=Object.keys(toolTotal).filter(k=>toolTotal[k]>=MIN_CALLS)
+    .sort((a,b)=>(toolErrors[b]||0)/toolTotal[b]-(toolErrors[a]||0)/toolTotal[a]);
+  return {tools,toolTotal,toolErrors,totalResults,totalErrors};
+}
+
+// Per-session error count is harder to track in browser (no file separation)
+// Use total stats instead
+
+function getColor(rate){
+  if(rate>=0.2) return '#f85149';
+  if(rate>=0.08) return '#ffa657';
+  if(rate>=0.04) return '#e3b341';
+  return '#3fb950';
+}
+
+function renderStats(m,sessions) {
+  document.getElementById('sample').style.display='none';
+  document.getElementById('output').style.display='block';
+  const overall=(m.totalResults>0?(m.totalErrors/m.totalResults*100).toFixed(1):'0');
+  document.getElementById('errorCallout').innerHTML=`
+    <div class="error-num">${overall}%</div>
+    <div class="error-label"><strong>overall error rate</strong> across ${m.totalResults.toLocaleString()} tool calls<br><span style="font-size:.85rem">${m.totalErrors.toLocaleString()} total errors detected</span></div>`;
+  document.getElementById('statsRow').innerHTML=[
+    {val:sessions,lbl:'Sessions'},
+    {val:m.totalResults>999?(m.totalResults/1000).toFixed(0)+'K':m.totalResults,lbl:'Tool calls'},
+    {val:m.totalErrors.toLocaleString(),lbl:'Total errors'},
+    {val:overall+'%',lbl:'Error rate'},
+  ].map(s=>`<div class="stat-box"><div class="stat-val">${s.val}</div><div class="stat-lbl">${s.lbl}</div></div>`).join('');
+  const maxRate=m.tools.length>0?(m.toolErrors[m.tools[0]]||0)/m.toolTotal[m.tools[0]]:1;
+  document.getElementById('toolCard').innerHTML=`
+    <div class="card-title">Error rate by tool</div>
+    <div class="card-sub">Tools with ≥${MIN_CALLS} calls, ranked by error rate</div>
+    ${m.tools.slice(0,10).map(t=>{
+      const n=m.toolTotal[t],e=m.toolErrors[t]||0,rate=e/n;
+      const p=(rate*100).toFixed(1),w=maxRate>0?Math.round(rate/maxRate*100):0;
+      return `<div class="err-row"><div class="err-tool">${t}</div><div class="err-track"><div class="err-fill" style="width:${w}%;background:${getColor(rate)}"></div><div class="err-pct">${p}%</div></div><div class="err-count">${e}/${n.toLocaleString()}</div></div>`;
+    }).join('')}`;
+  const top=m.tools[0];
+  document.getElementById('insightCard').innerHTML=`
+    <div class="card-title">What this means</div>
+    <ul>
+      <li><strong>${overall}% overall error rate</strong> — Claude handles ~1 error per ${m.totalErrors>0?Math.round(m.totalResults/m.totalErrors):0} tool calls</li>
+      ${top?`<li><strong>${top} fails ${((m.toolErrors[top]||0)/m.toolTotal[top]*100).toFixed(1)}% of the time</strong> — the most unreliable tool in your sessions</li>`:''}
+      <li><strong>WebFetch is typically worst</strong> — blocked URLs, auth walls, and timeouts hit constantly</li>
+      <li><strong>Bash errors</strong> — commands that exit non-zero or pipes that break</li>
+      <li><strong>Read errors</strong> — usually reading a file path that doesn't exist yet</li>
+      <li><strong>Edit errors</strong> — old_string not found in file is the most common cause</li>
+    </ul>`;
+}
+
+const dz=document.getElementById('dropZone');
+const fi=document.getElementById('fileInput');
+dz.onclick=()=>fi.click();
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('drag')};
+dz.ondragleave=()=>dz.classList.remove('drag');
+dz.ondrop=e=>{e.preventDefault();dz.classList.remove('drag');handleFiles(e.dataTransfer.files)};
+fi.onchange=e=>handleFiles(e.target.files);
+
+async function handleFiles(files) {
+  const jsonlFiles=[...files].filter(f=>f.name.endsWith('.jsonl'));
+  if(!jsonlFiles.length){document.getElementById('status').textContent='No .jsonl files found';return;}
+  dz.classList.add('loaded');
+  document.getElementById('status').textContent=`Processing ${jsonlFiles.length} files…`;
+  const allLines=[];
+  await Promise.all(jsonlFiles.map(f=>f.text().then(t=>allLines.push(...t.split('\n')))));
+  const m=processLines(allLines);
+  renderStats(m,jsonlFiles.length);
+  document.getElementById('status').textContent=`${jsonlFiles.length} sessions · ${m.totalErrors.toLocaleString()} errors detected`;
+}
+</script>
+</body>
+</html>

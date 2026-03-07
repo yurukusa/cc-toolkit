@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cc-audit-log — What Did Your AI Do?</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px; }
+
+  h1 { font-family: monospace; font-size: 1.3rem; color: #58a6ff; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 24px; }
+
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: center; margin-bottom: 24px; }
+  .picker-btn { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s; }
+  .picker-btn:hover { background: #30363d; }
+  #fileInput { display: none; }
+
+  .date-select { background: #161b22; border: 1px solid #30363d; color: #e6edf3; padding: 8px 12px; border-radius: 8px; font-size: 0.85rem; cursor: pointer; }
+  .date-select:focus { outline: none; border-color: #58a6ff; }
+
+  .outer { width: 100%; max-width: 720px; }
+
+  .summary-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .summary-chip { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 8px 14px; font-size: 0.8rem; display: flex; align-items: center; gap: 6px; }
+  .summary-chip strong { font-family: monospace; font-size: 0.88rem; }
+
+  .session-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .session-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; cursor: pointer; }
+  .session-header:hover { background: #1c2128; }
+  .session-title { font-size: 0.9rem; font-weight: 600; color: #79c0ff; font-family: monospace; }
+  .session-meta { font-size: 0.75rem; color: #8b949e; }
+  .session-badge { font-size: 0.72rem; padding: 2px 8px; border-radius: 12px; background: #21262d; color: #8b949e; }
+  .session-badge.sub { background: rgba(255,215,0,0.1); color: #ffd700; }
+
+  .event-list { padding: 0 16px 12px; border-top: 1px solid #21262d; }
+  .event-list.hidden { display: none; }
+  .event { display: flex; gap: 10px; padding: 5px 0; border-bottom: 1px solid #0d1117; font-size: 0.8rem; align-items: flex-start; }
+  .event:last-child { border-bottom: none; }
+  .event-time { color: #8b949e; font-family: monospace; flex-shrink: 0; width: 46px; }
+  .event-icon { flex-shrink: 0; width: 18px; text-align: center; }
+  .event-detail { color: #e6edf3; font-family: monospace; word-break: break-all; flex: 1; }
+  .event-risk { color: #f85149; font-size: 0.75rem; margin-top: 2px; }
+
+  .tag-create { color: #56d364; }
+  .tag-modify { color: #79c0ff; }
+  .tag-bash { color: #ffa657; }
+  .tag-git { color: #d2a8ff; }
+  .tag-agent { color: #ffd700; }
+  .tag-risk { color: #f85149; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: #8b949e; }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.88rem; line-height: 1.6; }
+
+  .hint { font-size: 0.78rem; color: #8b949e; text-align: center; margin-top: 16px; }
+  .hint a { color: #58a6ff; text-decoration: none; }
+
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; font-size: 0.75rem; color: #8b949e; }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+
+  .loading { text-align: center; padding: 20px; color: #8b949e; font-size: 0.88rem; }
+</style>
+</head>
+<body>
+
+<h1>cc-audit-log</h1>
+<p class="subtitle">See what your Claude Code actually did. Reads session transcripts locally.</p>
+
+<div class="controls">
+  <label class="picker-btn" for="fileInput">
+    📁 Select ~/.claude Folder
+  </label>
+  <input type="file" id="fileInput" webkitdirectory multiple>
+  <select class="date-select" id="dateSelect">
+    <option value="today">Today</option>
+    <option value="yesterday">Yesterday</option>
+    <option value="2days">2 days ago</option>
+    <option value="3days">3 days ago</option>
+    <option value="7days">Last 7 days</option>
+  </select>
+</div>
+
+<div class="outer" id="outer">
+  <div class="empty-state">
+    <div class="icon">🔍</div>
+    <p>Select your <strong>~/.claude</strong> folder to see an audit trail of what your AI did.</p>
+    <br>
+    <p style="color:#8b949e;font-size:0.8rem;">Reads session transcripts and extracts: files created/modified,<br>bash commands, git operations, subagent spawns, and risk flags.</p>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:16px;">Also available as CLI: <a href="https://github.com/yurukusa/cc-audit-log" target="_blank">npx cc-audit-log</a> · Part of <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit</a></p>
+
+<script>
+// ── Date helpers ──────────────────────────────────────────────────────────────
+function toLocalDate(d) { return d.toLocaleDateString('sv-SE'); }
+function today() { return toLocalDate(new Date()); }
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return toLocalDate(d);
+}
+function fmtTime(ts) {
+  if (!ts) return '--:--';
+  return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+function fmtDate(ts) {
+  if (!ts) return '?';
+  return new Date(ts).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// ── Risk patterns ─────────────────────────────────────────────────────────────
+const RISK_PATTERNS = [
+  { pattern: /\brm\s+-rf\b/, label: 'rm -rf' },
+  { pattern: /\bgit\s+push\s+--force\b/, label: 'force push' },
+  { pattern: /\bgit\s+reset\s+--hard\b/, label: 'hard reset' },
+  { pattern: /\bnpm\s+publish\b/, label: 'npm publish' },
+  { pattern: /\bsudo\b/, label: 'sudo' },
+  { pattern: /\bkill\s+-9\b/, label: 'kill -9' },
+];
+
+function checkRisk(cmd) {
+  return RISK_PATTERNS.filter(r => r.pattern.test(cmd)).map(r => r.label);
+}
+
+// ── Project name helper ───────────────────────────────────────────────────────
+function cleanProjectName(dirName) {
+  if (!dirName) return '?';
+  if (dirName.startsWith('-tmp')) return '/tmp';
+  const parts = dirName.split('-').filter(Boolean);
+  if (parts[0] === 'home' && parts.length >= 2) {
+    const rest = parts.slice(2);
+    if (rest.length === 0) return '~';
+    if (rest[0] === 'projects') rest.shift();
+    return rest.join('-') || '~';
+  }
+  return dirName;
+}
+
+function shortenPath(p) {
+  if (!p) return '';
+  // Remove /home/... prefix
+  return p.replace(/^\/home\/[^/]+\//, '~/');
+}
+
+// ── Read last N bytes of a file and parse JSONL lines ─────────────────────────
+async function parseSessionFile(file, maxBytes = 262144) { // 256KB
+  const size = file.size;
+  const offset = Math.max(0, size - maxBytes);
+  try {
+    const buf = await file.slice(offset, size).arrayBuffer();
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(buf);
+    const lines = text.split('\n');
+
+    const events = [];
+    let firstTs = null;
+    let lastTs = null;
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      let record;
+      try { record = JSON.parse(line); } catch { continue; }
+
+      const ts = record.timestamp;
+      if (ts) {
+        if (!firstTs) firstTs = ts;
+        lastTs = ts;
+      }
+
+      // Only look at assistant messages with tool_use content
+      if (record.type !== 'assistant') continue;
+      const content = record.message?.content;
+      if (!Array.isArray(content)) continue;
+
+      for (const block of content) {
+        if (block.type !== 'tool_use') continue;
+        const name = block.name;
+        const input = block.input || {};
+
+        switch (name) {
+          case 'Write': {
+            const fp = shortenPath(input.file_path || '');
+            events.push({ ts, type: 'create', icon: '✏️', detail: `Write: ${fp}` });
+            break;
+          }
+          case 'Edit': {
+            const fp = shortenPath(input.file_path || '');
+            events.push({ ts, type: 'modify', icon: '📝', detail: `Edit: ${fp}` });
+            break;
+          }
+          case 'Bash': {
+            const cmd = (input.command || '').trim();
+            const desc = input.description || '';
+            const shortCmd = cmd.length > 100 ? cmd.slice(0, 97) + '...' : cmd;
+            const risk = checkRisk(cmd);
+
+            // Filter out noisy commands
+            const skipCmds = /^(ls|echo|cat|head|tail|wc|date|pwd|which|type|command|true|false)\b/;
+            if (skipCmds.test(cmd) && !risk.length) break;
+
+            // Git operations
+            if (/^git\s/.test(cmd)) {
+              const gitOp = cmd.match(/^git\s+(\S+)/)?.[1] || 'git';
+              events.push({ ts, type: 'git', icon: '🔧', detail: desc || shortCmd, risk });
+            } else {
+              events.push({ ts, type: 'bash', icon: '⚡', detail: desc || shortCmd, risk });
+            }
+            break;
+          }
+          case 'Agent': {
+            const desc2 = input.description || 'subagent';
+            events.push({ ts, type: 'agent', icon: '🤖', detail: `Spawned agent: ${desc2.slice(0, 80)}` });
+            break;
+          }
+          default: break;
+        }
+      }
+    }
+
+    return { events, firstTs, lastTs };
+  } catch { return { events: [], firstTs: null, lastTs: null }; }
+}
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let _cachedSessions = null;
+
+// ── Date range ────────────────────────────────────────────────────────────────
+function getDateRange(period) {
+  const td = today();
+  switch (period) {
+    case 'today': return [td, td];
+    case 'yesterday': return [addDays(td, -1), addDays(td, -1)];
+    case '2days': return [addDays(td, -2), addDays(td, -2)];
+    case '3days': return [addDays(td, -3), addDays(td, -3)];
+    case '7days': return [addDays(td, -6), td];
+    default: return [td, td];
+  }
+}
+
+// ── Main processing ───────────────────────────────────────────────────────────
+async function processFiles(files) {
+  const jsonlFiles = Array.from(files).filter(f => {
+    const p = f.webkitRelativePath || f.name;
+    return p.endsWith('.jsonl') && p.includes('/projects/');
+  });
+
+  const sessions = [];
+  for (const file of jsonlFiles) {
+    const p = file.webkitRelativePath || file.name;
+    const isSub = p.includes('/subagents/');
+    const parts = p.split('/');
+    const projIdx = parts.indexOf('projects');
+    const dirName = projIdx >= 0 ? parts[projIdx + 1] : '';
+    const projName = cleanProjectName(dirName);
+
+    // Quick first-line read to get start time
+    try {
+      const CHUNK = 512;
+      const headBuf = await file.slice(0, Math.min(CHUNK, file.size)).arrayBuffer();
+      const firstLine = new TextDecoder().decode(headBuf).split('\n')[0];
+      const firstObj = JSON.parse(firstLine);
+      const startTs = firstObj.timestamp;
+      if (startTs) {
+        sessions.push({ file, projName, isSub, startTs, size: file.size });
+      }
+    } catch {}
+  }
+
+  return sessions;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+async function renderPeriod(sessions, period) {
+  const [startDate, endDate] = getDateRange(period);
+  const outer = document.getElementById('outer');
+
+  // Filter sessions by date range
+  const filtered = sessions.filter(s => {
+    const d = toLocalDate(new Date(s.startTs));
+    return d >= startDate && d <= endDate;
+  }).sort((a, b) => new Date(b.startTs) - new Date(a.startTs));
+
+  if (filtered.length === 0) {
+    outer.innerHTML = `<div class="empty-state"><div class="icon">😴</div><p>No sessions found for this period.</p></div>`;
+    return;
+  }
+
+  outer.innerHTML = `<div class="loading">Parsing ${filtered.length} sessions… This may take a moment.</div>`;
+
+  // Parse top 20 sessions (limit to avoid browser freeze)
+  const toProcess = filtered.slice(0, 20);
+  const parsed = [];
+  let totalEvents = 0, totalRisks = 0;
+
+  for (const s of toProcess) {
+    const result = await parseSessionFile(s.file);
+    const { events, lastTs } = result;
+    totalEvents += events.length;
+    totalRisks += events.filter(e => e.risk?.length > 0).length;
+    parsed.push({ ...s, events, lastTs: lastTs || s.startTs });
+  }
+
+  const moreCount = filtered.length - toProcess.length;
+  const periodLabel = { today: 'Today', yesterday: 'Yesterday', '2days': '2 days ago', '3days': '3 days ago', '7days': 'Last 7 days' }[period];
+
+  const summaryHTML = `
+    <div class="summary-row">
+      <div class="summary-chip">📅 <strong>${periodLabel}</strong> · ${filtered.length} sessions</div>
+      <div class="summary-chip">⚡ <strong>${totalEvents}</strong> actions logged</div>
+      ${totalRisks > 0 ? `<div class="summary-chip" style="border-color:#f85149"><span style="color:#f85149">⚠</span> <strong style="color:#f85149">${totalRisks}</strong> risk flags</div>` : ''}
+      ${moreCount > 0 ? `<div class="summary-chip">+ ${moreCount} more not shown</div>` : ''}
+    </div>
+    <div class="legend">
+      <div class="legend-item"><span class="tag-create">✏️</span> Create</div>
+      <div class="legend-item"><span class="tag-modify">📝</span> Edit</div>
+      <div class="legend-item"><span class="tag-bash">⚡</span> Bash</div>
+      <div class="legend-item"><span class="tag-git">🔧</span> Git</div>
+      <div class="legend-item"><span class="tag-agent">🤖</span> Agent</div>
+      <div class="legend-item"><span class="tag-risk">⚠</span> Risk</div>
+    </div>
+  `;
+
+  const sessionsHTML = parsed.map((s, idx) => {
+    const startTime = fmtTime(s.startTs);
+    const endTime = fmtTime(s.lastTs);
+    const dateStr = fmtDate(s.startTs);
+    const durationMs = new Date(s.lastTs) - new Date(s.startTs);
+    const durationMin = Math.round(durationMs / 60000);
+    const durationStr = durationMin > 60 ? `${Math.floor(durationMin/60)}h ${durationMin%60}m` : `${durationMin}m`;
+
+    const eventsHTML = s.events.map(e => {
+      const riskHTML = e.risk?.length ? `<div class="event-risk">⚠ ${e.risk.join(', ')}</div>` : '';
+      const cls = e.type === 'create' ? 'tag-create' : e.type === 'modify' ? 'tag-modify' : e.type === 'git' ? 'tag-git' : e.type === 'agent' ? 'tag-agent' : 'tag-bash';
+      return `<div class="event">
+        <span class="event-time">${fmtTime(e.ts)}</span>
+        <span class="event-icon ${cls}">${e.icon}</span>
+        <div>
+          <div class="event-detail">${escHtml(e.detail)}</div>
+          ${riskHTML}
+        </div>
+      </div>`;
+    }).join('');
+
+    const isOpen = idx === 0; // First session open by default
+    return `
+      <div class="session-card">
+        <div class="session-header" onclick="toggleSession(${idx})">
+          <div>
+            <div class="session-title">${escHtml(s.projName)}</div>
+            <div class="session-meta">${dateStr} · ${startTime}–${endTime} · ${durationStr} · ${s.events.length} actions</div>
+          </div>
+          <span class="session-badge${s.isSub ? ' sub' : ''}">${s.isSub ? '🤖 AI' : '👤 You'}</span>
+        </div>
+        <div class="event-list${isOpen ? '' : ' hidden'}" id="events-${idx}">
+          ${s.events.length > 0 ? eventsHTML : '<div style="padding:8px;color:#8b949e;font-size:0.8rem;">No significant actions found in last 256KB of this session.</div>'}
+        </div>
+      </div>`;
+  }).join('');
+
+  outer.innerHTML = summaryHTML + sessionsHTML;
+}
+
+function toggleSession(idx) {
+  const el = document.getElementById(`events-${idx}`);
+  if (el) el.classList.toggle('hidden');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── Events ────────────────────────────────────────────────────────────────────
+const dateSelect = document.getElementById('dateSelect');
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  document.getElementById('outer').innerHTML = `<div class="empty-state"><div class="icon">⏳</div><p>Scanning ${files.length} files…</p></div>`;
+
+  try {
+    _cachedSessions = await processFiles(files);
+    await renderPeriod(_cachedSessions, dateSelect.value);
+  } catch (err) {
+    document.getElementById('outer').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>Error: ${err.message}</p></div>`;
+  }
+});
+
+dateSelect.addEventListener('change', async () => {
+  if (_cachedSessions) {
+    await renderPeriod(_cachedSessions, dateSelect.value);
+  }
+});
+</script>
+</body>
+</html>

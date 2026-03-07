@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CC Cost Forecast — Project your Claude Code spend to month-end</title>
+<meta name="description" content="Paste your session logs or select your .claude folder to see your API-equivalent Claude Code cost forecast for this month.">
+<meta property="og:title" content="CC Cost Forecast — Month-end Claude Code cost estimator">
+<meta property="og:description" content="See your daily spend, weekly burn, and projected month-end cost. Zero server. Runs entirely in your browser.">
+<meta property="og:url" content="https://yurukusa.github.io/cc-cost-forecast/">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:site" content="@yurukusa_dev">
+<meta name="twitter:title" content="CC Cost Forecast">
+<meta name="twitter:description" content="Project your Claude Code API spend to month-end. Runs 100% local.">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #7d8590;
+  --cyan: #56d364;
+  --blue: #58a6ff;
+  --yellow: #d29922;
+  --red: #f85149;
+  --green: #56d364;
+  --purple: #bc8cff;
+  --ok: #238636;
+  --warn: #9e6a03;
+  --danger: #b62324;
+}
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 24px 16px; }
+.container { max-width: 680px; margin: 0 auto; }
+h1 { font-size: 1.4rem; font-weight: 700; color: var(--cyan); margin-bottom: 4px; }
+.subtitle { color: var(--muted); font-size: 0.88rem; margin-bottom: 28px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; }
+.card-title { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+.upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 32px; text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; }
+.upload-zone:hover, .upload-zone.drag { border-color: var(--blue); background: rgba(88,166,255,0.04); }
+.upload-zone p { color: var(--muted); font-size: 0.9rem; margin: 8px 0; }
+.upload-zone .icon { font-size: 2rem; margin-bottom: 8px; }
+button { background: var(--blue); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+button:hover { opacity: 0.85; }
+button.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.or { color: var(--muted); font-size: 0.82rem; margin: 12px 0; }
+.metric-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.metric-row:last-child { border-bottom: none; }
+.metric-label { color: var(--muted); font-size: 0.9rem; }
+.metric-val { font-size: 1.05rem; font-weight: 700; color: var(--text); }
+.metric-sub { color: var(--muted); font-size: 0.78rem; margin-left: 6px; font-weight: 400; }
+.forecast-num { font-size: 2rem; font-weight: 800; color: var(--cyan); line-height: 1; }
+.plan-row { display: grid; grid-template-columns: 56px 1fr 52px 80px; gap: 10px; align-items: center; margin: 8px 0; }
+.plan-name { font-size: 0.85rem; font-weight: 700; }
+.bar-track { height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 5px; transition: width 0.4s; }
+.bar-fill.ok { background: var(--ok); }
+.bar-fill.warn { background: var(--warn); }
+.bar-fill.danger { background: var(--danger); }
+.bar-fill.over { background: var(--red); width: 100% !important; }
+.pct { font-size: 0.82rem; color: var(--muted); text-align: right; }
+.status { font-size: 0.75rem; font-weight: 700; text-align: right; }
+.status.ok { color: var(--green); }
+.status.warn { color: var(--yellow); }
+.status.danger { color: var(--red); }
+.spark { font-family: monospace; font-size: 1.3rem; line-height: 1; letter-spacing: 1px; color: var(--cyan); word-break: break-all; }
+.spark-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.73rem; margin-top: 6px; }
+.note { color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+.note a { color: var(--blue); text-decoration: none; }
+.note a:hover { text-decoration: underline; }
+.hidden { display: none; }
+.loading { text-align: center; padding: 24px; color: var(--muted); }
+.spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 8px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.error { background: rgba(248,81,73,0.1); border: 1px solid rgba(248,81,73,0.3); border-radius: 8px; padding: 12px 16px; color: var(--red); font-size: 0.88rem; margin-top: 12px; }
+.paste-area { width: 100%; min-height: 120px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-family: monospace; font-size: 0.82rem; padding: 12px; resize: vertical; outline: none; }
+.paste-area:focus { border-color: var(--blue); }
+.tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.tab { padding: 6px 16px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.tab.active { background: var(--surface2); color: var(--text); border-color: var(--blue); }
+#results { display: none; }
+#results.visible { display: block; }
+footer { text-align: center; color: var(--muted); font-size: 0.78rem; margin-top: 32px; padding-bottom: 16px; }
+footer a { color: var(--blue); text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>cc-cost-forecast</h1>
+  <p class="subtitle">Project your Claude Code API-equivalent spend to month-end. Runs 100% in your browser.</p>
+
+  <div id="input-section">
+    <div class="tabs">
+      <div class="tab active" id="tab-folder" onclick="switchTab('folder')">📁 Select Folder</div>
+      <div class="tab" id="tab-paste" onclick="switchTab('paste')">📋 Paste Data</div>
+    </div>
+
+    <!-- Folder tab -->
+    <div id="tab-content-folder">
+      <div class="card">
+        <div class="card-title">Pick your .claude/projects directory</div>
+        <div class="upload-zone" id="drop-zone" onclick="pickFolder()">
+          <div class="icon">📂</div>
+          <p><strong>Click to select folder</strong></p>
+          <p>Navigate to <code style="color:var(--cyan)">~/.claude/projects</code> and select it</p>
+          <p style="margin-top:12px"><button onclick="event.stopPropagation(); pickFolder()">Select Folder</button></p>
+        </div>
+        <div id="folder-error" class="error hidden"></div>
+        <p class="note" style="margin-top:14px">⚠ Your data never leaves your browser. No server, no uploads. Files are read locally via <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API" target="_blank">File System Access API</a>.<br>
+        Requires Chrome/Edge 86+. Firefox: use Paste tab instead.</p>
+      </div>
+    </div>
+
+    <!-- Paste tab -->
+    <div id="tab-content-paste" class="hidden">
+      <div class="card">
+        <div class="card-title">Paste raw .jsonl content</div>
+        <p class="note" style="margin-bottom:10px">Copy any <code style="color:var(--cyan)">.jsonl</code> file from <code style="color:var(--cyan)">~/.claude/projects/</code> and paste below. Multiple files: separate with a blank line.</p>
+        <textarea class="paste-area" id="paste-input" placeholder='{"type":"assistant","timestamp":"2026-03-01T10:00:00Z","message":{"usage":{"input_tokens":1234,"output_tokens":567}}}'></textarea>
+        <div style="margin-top:10px">
+          <button onclick="processPaste()">Analyze</button>
+          <button class="secondary" style="margin-left:8px" onclick="clearPaste()">Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="loading" class="loading hidden">
+      <span class="spinner"></span> Reading files…
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div class="card">
+      <div class="card-title">This Month</div>
+      <div class="metric-row">
+        <span class="metric-label">Today</span>
+        <span><span class="metric-val" id="m-today">—</span></span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">This week</span>
+        <span><span class="metric-val" id="m-week">—</span></span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Month to date</span>
+        <span><span class="metric-val" id="m-month">—</span><span class="metric-sub" id="m-month-sub"></span></span>
+      </div>
+      <div class="metric-row">
+        <span class="metric-label">Daily average</span>
+        <span><span class="metric-val" id="m-avg">—</span><span class="metric-sub" id="m-avg-sub"></span></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Month-End Forecast</div>
+      <div style="text-align:center;padding:12px 0 20px">
+        <div class="forecast-num" id="m-forecast">—</div>
+        <div style="color:var(--muted);font-size:0.82rem;margin-top:6px" id="m-forecast-sub"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">vs. Claude Max Plan Tiers</div>
+      <div id="plan-rows"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Daily Cost — Last 30 Days</div>
+      <div class="spark" id="spark"></div>
+      <div class="spark-label">
+        <span id="spark-start"></span>
+        <span>today</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="note">
+        <strong>Note:</strong> Figures are API-rate equivalents, not your actual Max plan charge.<br>
+        They show <em>relative usage intensity</em> vs. what the API would cost at Sonnet 4.x pricing:<br>
+        input $3/M · output $15/M · cache_write $3.75/M · cache_read $0.30/M<br><br>
+        Your actual cost is your subscription fee ($20 – $400/month).
+        These numbers help you understand how intensely you're using Claude Code.
+      </p>
+      <p class="note" style="margin-top:10px">
+        <a href="https://github.com/yurukusa/cc-cost-forecast" target="_blank">GitHub</a> ·
+        <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit</a> ·
+        <code>npx cc-cost-forecast</code> for the CLI version
+      </p>
+    </div>
+    <div style="margin-top:16px;text-align:center">
+      <button class="secondary" onclick="reset()">← Analyze another</button>
+    </div>
+  </div>
+
+  <footer>
+    Part of <a href="https://yurukusa.github.io/cc-toolkit/">cc-toolkit</a> · 106 free tools for Claude Code ·
+    <a href="https://github.com/yurukusa/cc-cost-forecast">GitHub</a>
+  </footer>
+</div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────
+const PRICE = { input: 3.00, output: 15.00, cache_write: 3.75, cache_read: 0.30 };
+const PLANS = [
+  { name: '$20',  limit: 20  },
+  { name: '$100', limit: 100 },
+  { name: '$200', limit: 200 },
+  { name: '$400', limit: 400 },
+];
+const SPARK_CHARS = ' ▁▂▃▄▅▆▇█';
+
+// ── Tab ────────────────────────────────────────────────────────────────
+let currentTab = 'folder';
+function switchTab(t) {
+  currentTab = t;
+  document.getElementById('tab-folder').className = 'tab' + (t === 'folder' ? ' active' : '');
+  document.getElementById('tab-paste').className  = 'tab' + (t === 'paste'  ? ' active' : '');
+  document.getElementById('tab-content-folder').className = t === 'folder' ? '' : 'hidden';
+  document.getElementById('tab-content-paste').className  = t === 'paste'  ? '' : 'hidden';
+}
+
+// ── Parse ──────────────────────────────────────────────────────────────
+function tokenCost(u) {
+  if (!u) return 0;
+  const i  = (u.input_tokens || 0) * PRICE.input / 1e6;
+  const o  = (u.output_tokens || 0) * PRICE.output / 1e6;
+  const cw = (u.cache_creation_input_tokens || 0) * PRICE.cache_write / 1e6;
+  const cr = (u.cache_read_input_tokens || 0) * PRICE.cache_read / 1e6;
+  return i + o + cw + cr;
+}
+
+function parseLines(text) {
+  const dayCosts = {};
+  for (const line of text.split('\n')) {
+    const l = line.trim();
+    if (!l) continue;
+    let obj;
+    try { obj = JSON.parse(l); } catch { continue; }
+    if (obj.type !== 'assistant') continue;
+    const usage = obj.message?.usage || obj.usage;
+    if (!usage) continue;
+    const c = tokenCost(usage);
+    if (c <= 0) continue;
+    const ts = obj.timestamp || obj.created_at;
+    if (!ts) continue;
+    const day = new Date(ts).toISOString().slice(0, 10);
+    dayCosts[day] = (dayCosts[day] || 0) + c;
+  }
+  return dayCosts;
+}
+
+// ── Summarize ──────────────────────────────────────────────────────────
+function summarize(dayCosts) {
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const monthPrefix = todayStr.slice(0, 7);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const dayOfMonth = now.getUTCDate();
+  const daysRemaining = daysInMonth - dayOfMonth;
+
+  const monthDays = Object.keys(dayCosts).filter(d => d.startsWith(monthPrefix)).sort();
+  const monthCost = monthDays.reduce((s, d) => s + dayCosts[d], 0);
+  const todayCost = dayCosts[todayStr] || 0;
+
+  const dow = now.getUTCDay();
+  const weekStart = new Date(now);
+  weekStart.setUTCDate(now.getUTCDate() - (dow === 0 ? 6 : dow - 1));
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  const weekCost = Object.entries(dayCosts)
+    .filter(([d]) => d >= weekStartStr && d <= todayStr)
+    .reduce((s, [, v]) => s + v, 0);
+
+  const activeDaysThisMonth = monthDays.length || 1;
+  const dailyAvg = monthCost / activeDaysThisMonth;
+  const forecast = monthCost + daysRemaining * dailyAvg;
+
+  const last30 = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    last30.push(dayCosts[d.toISOString().slice(0, 10)] || 0);
+  }
+  const d30ago = new Date(now);
+  d30ago.setUTCDate(d30ago.getUTCDate() - 29);
+
+  return { today: todayCost, weekCost, monthCost, dailyAvg, forecast,
+           dayOfMonth, daysInMonth, daysRemaining, activeDaysThisMonth,
+           last30, sparkStart: d30ago.toISOString().slice(0, 10), monthPrefix };
+}
+
+// ── Render ─────────────────────────────────────────────────────────────
+function fmtCost(d) {
+  if (d === 0) return '$0.000';
+  if (d < 0.001) return '<$0.001';
+  return '$' + d.toFixed(3);
+}
+
+function sparkline(values) {
+  const max = Math.max(...values, 0.001);
+  return values.map(x => {
+    const idx = Math.round((x / max) * (SPARK_CHARS.length - 1));
+    return SPARK_CHARS[idx];
+  }).join('');
+}
+
+function barFillClass(pct) {
+  if (pct >= 1.0) return 'over';
+  if (pct >= 0.9) return 'danger';
+  if (pct >= 0.75) return 'warn';
+  return 'ok';
+}
+
+function statusText(pct) {
+  if (pct >= 1.0) return ['danger', 'OVER'];
+  if (pct >= 0.9) return ['danger', 'HOT'];
+  if (pct >= 0.75) return ['warn', 'HIGH'];
+  return ['ok', 'OK'];
+}
+
+function renderResults(s) {
+  document.getElementById('m-today').textContent  = fmtCost(s.today);
+  document.getElementById('m-week').textContent   = fmtCost(s.weekCost);
+  document.getElementById('m-month').textContent  = fmtCost(s.monthCost);
+  document.getElementById('m-month-sub').textContent = `(${s.dayOfMonth} of ${s.daysInMonth} days)`;
+  document.getElementById('m-avg').textContent    = fmtCost(s.dailyAvg);
+  document.getElementById('m-avg-sub').textContent   = `(${s.activeDaysThisMonth} active days)`;
+  document.getElementById('m-forecast').textContent = fmtCost(s.forecast);
+  document.getElementById('m-forecast-sub').textContent = `At current pace · ${s.daysRemaining} days remaining`;
+  document.getElementById('spark').textContent    = sparkline(s.last30);
+  document.getElementById('spark-start').textContent = s.sparkStart;
+
+  const planRows = PLANS.map(plan => {
+    const pct = Math.min(s.forecast / plan.limit, 1.0);
+    const pctLabel = Math.round((s.forecast / plan.limit) * 100) + '%';
+    const fillClass = barFillClass(s.forecast / plan.limit);
+    const [stClass, stText] = statusText(s.forecast / plan.limit);
+    return `
+      <div class="plan-row">
+        <span class="plan-name">${plan.name}</span>
+        <div class="bar-track"><div class="bar-fill ${fillClass}" style="width:${Math.min(pct*100,100).toFixed(1)}%"></div></div>
+        <span class="pct">${pctLabel}</span>
+        <span class="status ${stClass}">${stText}</span>
+      </div>`;
+  }).join('');
+  document.getElementById('plan-rows').innerHTML = planRows;
+
+  document.getElementById('input-section').style.display = 'none';
+  document.getElementById('results').classList.add('visible');
+}
+
+// ── Folder picker ──────────────────────────────────────────────────────
+async function pickFolder() {
+  if (!window.showDirectoryPicker) {
+    showError('folder-error', 'Your browser does not support the File System Access API. Please use Chrome or Edge, or use the Paste tab.');
+    return;
+  }
+  let dirHandle;
+  try {
+    dirHandle = await window.showDirectoryPicker({ mode: 'read' });
+  } catch (e) {
+    if (e.name !== 'AbortError') showError('folder-error', 'Could not open folder: ' + e.message);
+    return;
+  }
+  setLoading(true);
+  try {
+    const dayCosts = {};
+    await walkDir(dirHandle, dayCosts);
+    const total = Object.values(dayCosts).reduce((s, v) => s + v, 0);
+    if (total === 0) {
+      showError('folder-error', 'No Claude Code sessions found. Make sure you selected the ~/.claude/projects directory.');
+      setLoading(false);
+      return;
+    }
+    const s = summarize(dayCosts);
+    renderResults(s);
+  } catch (e) {
+    showError('folder-error', 'Error reading files: ' + e.message);
+  }
+  setLoading(false);
+}
+
+async function walkDir(dirHandle, dayCosts) {
+  for await (const [name, handle] of dirHandle.entries()) {
+    if (handle.kind === 'directory') {
+      await walkDir(handle, dayCosts);
+    } else if (handle.kind === 'file' && name.endsWith('.jsonl')) {
+      const file = await handle.getFile();
+      const text = await file.text();
+      const dayMap = parseLines(text);
+      for (const [day, cost] of Object.entries(dayMap)) {
+        dayCosts[day] = (dayCosts[day] || 0) + cost;
+      }
+    }
+  }
+}
+
+// ── Paste ──────────────────────────────────────────────────────────────
+function processPaste() {
+  const text = document.getElementById('paste-input').value.trim();
+  if (!text) return;
+  const dayCosts = parseLines(text);
+  const total = Object.values(dayCosts).reduce((s, v) => s + v, 0);
+  if (total === 0) {
+    alert('No assistant messages with usage data found. Make sure you pasted .jsonl content.');
+    return;
+  }
+  const s = summarize(dayCosts);
+  renderResults(s);
+}
+
+function clearPaste() {
+  document.getElementById('paste-input').value = '';
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function setLoading(on) {
+  document.getElementById('loading').classList.toggle('hidden', !on);
+  document.getElementById('tab-content-folder').style.opacity = on ? '0.5' : '1';
+}
+
+function showError(id, msg) {
+  const el = document.getElementById(id);
+  if (el) { el.textContent = msg; el.classList.remove('hidden'); }
+}
+
+function reset() {
+  document.getElementById('input-section').style.display = '';
+  document.getElementById('results').classList.remove('visible');
+  document.getElementById('folder-error').classList.add('hidden');
+}
+
+// ── Drag and drop ──────────────────────────────────────────────────────
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', async e => {
+  e.preventDefault();
+  dz.classList.remove('drag');
+  // Items API for folder drag
+  if (e.dataTransfer.items) {
+    for (const item of e.dataTransfer.items) {
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry?.();
+        if (entry?.isDirectory) {
+          setLoading(true);
+          try {
+            const dayCosts = {};
+            await walkWebkitDir(entry, dayCosts);
+            const total = Object.values(dayCosts).reduce((s, v) => s + v, 0);
+            if (total === 0) {
+              showError('folder-error', 'No Claude Code sessions found in dropped folder.');
+            } else {
+              renderResults(summarize(dayCosts));
+            }
+          } catch(err) {
+            showError('folder-error', 'Error: ' + err.message);
+          }
+          setLoading(false);
+          return;
+        }
+      }
+    }
+  }
+});
+
+function walkWebkitDir(dirEntry, dayCosts) {
+  return new Promise((resolve, reject) => {
+    const reader = dirEntry.createReader();
+    const readAll = (entries) => {
+      reader.readEntries(async (newEntries) => {
+        if (!newEntries.length) {
+          const promises = entries.map(e => {
+            if (e.isDirectory) return walkWebkitDir(e, dayCosts);
+            if (e.isFile && e.name.endsWith('.jsonl')) {
+              return new Promise((res) => {
+                e.file(f => f.text().then(t => {
+                  const dayMap = parseLines(t);
+                  for (const [day, cost] of Object.entries(dayMap)) {
+                    dayCosts[day] = (dayCosts[day] || 0) + cost;
+                  }
+                  res();
+                }));
+              });
+            }
+            return Promise.resolve();
+          });
+          await Promise.all(promises);
+          resolve();
+        } else {
+          readAll([...entries, ...newEntries]);
+        }
+      }, reject);
+    };
+    readAll([]);
+  });
+}
+</script>
+</body>
+</html>

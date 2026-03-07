@@ -1,0 +1,40 @@
+{
+  "name": "review-ready-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for Review Ready — run pre-PR checks (debug statements, secrets, TODO debt, complexity) from Claude",
+  "main": "dist/index.js",
+  "bin": {
+    "review-ready-mcp": "dist/index.js"
+  },
+  "type": "module",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "code-review",
+    "pr",
+    "git",
+    "claude"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/review-ready-mcp"
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -watch",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.8.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

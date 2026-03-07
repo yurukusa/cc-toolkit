@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cc-bash-type — Bash Command Category Distribution</title>
+<meta name="description" content="25% of Claude Code Bash calls are inspect (cat/grep/ls). 15% execute code. 8% git. What does your workflow actually do?">
+<meta property="og:title" content="cc-bash-type — What Kind of Bash Does Claude Run?">
+<meta property="og:description" content="31% shell utils, 25% inspect, 15% execute, 8% git. Classify every Bash call by intent.">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+.hero{background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);border-bottom:1px solid #21262d;padding:48px 24px 40px;text-align:center}
+.hero h1{font-size:2.2rem;font-weight:700;color:#f0f6fc;letter-spacing:-0.5px}
+.hero h1 span{color:#ffa657}
+.hero p{color:#8b949e;margin-top:10px;font-size:1.05rem;max-width:540px;margin-inline:auto}
+.cmd{display:inline-block;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 18px;font-family:monospace;font-size:1rem;color:#79c0ff;margin-top:18px}
+.drop-zone{border:2px dashed #30363d;border-radius:12px;padding:32px;margin:28px auto;max-width:500px;text-align:center;cursor:pointer;transition:.2s;color:#8b949e;font-size:.95rem}
+.drop-zone:hover,.drop-zone.drag{border-color:#ffa657;color:#ffa657}
+.drop-zone.loaded{border-color:#3fb950;color:#3fb950}
+#status{text-align:center;color:#8b949e;font-size:.9rem;margin-bottom:8px}
+.main{max-width:960px;margin:0 auto;padding:32px 16px}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:24px}
+.stat-box{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:14px 16px;text-align:center}
+.stat-val{font-size:1.7rem;font-weight:700;color:#ffa657}
+.stat-lbl{font-size:.8rem;color:#8b949e;margin-top:3px}
+
+.card{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:20px;margin-bottom:24px}
+.card-title{font-size:1rem;font-weight:600;color:#f0f6fc;margin-bottom:6px}
+.card-sub{font-size:.82rem;color:#8b949e;margin-bottom:16px}
+
+/* Category bars */
+.cat-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.cat-label{width:82px;font-size:.84rem;font-family:monospace;color:#c9d1d9;text-align:right;flex-shrink:0;padding-top:4px}
+.cat-right{flex:1}
+.cat-track{background:#21262d;border-radius:4px;height:26px;position:relative;overflow:hidden;margin-bottom:4px}
+.cat-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.cat-pct{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.76rem;font-family:monospace;color:#e6edf3}
+.cat-cmds{font-size:.74rem;color:#484f58;font-family:monospace;padding-left:4px}
+
+/* Git breakdown */
+.git-row{display:flex;justify-content:space-between;padding:5px 10px;border-radius:4px;font-size:.84rem;font-family:monospace}
+.git-row:hover{background:#1c2128}
+.git-sub{color:#79c0ff}
+.git-count{color:#ffa657;font-weight:600}
+
+/* Insight */
+.insight ul{list-style:none;display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.insight li{font-size:.88rem;color:#8b949e;padding-left:18px;position:relative;line-height:1.5}
+.insight li::before{content:'→';position:absolute;left:0;color:#ffa657}
+.insight li strong{color:#e6edf3}
+
+.footer{text-align:center;padding:32px 16px;color:#8b949e;font-size:.85rem;border-top:1px solid #21262d;margin-top:16px}
+.footer a{color:#58a6ff;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>cc-<span>bash-type</span></h1>
+  <p>What kind of work does Claude actually do in Bash? 31% shell utils, 25% inspect, 15% execute, 8% git. Classify every command by intent.</p>
+  <div class="cmd">npx cc-bash-type</div>
+</div>
+
+<div class="main">
+  <div class="drop-zone" id="dropZone">
+    <div>📁 Drop your <code>~/.claude/projects/</code> folder here</div>
+    <div style="margin-top:6px;font-size:.82rem">or click to select</div>
+    <input type="file" id="fileInput" webkitdirectory style="display:none">
+  </div>
+  <div id="status">No data loaded — showing sample data from 1,835 sessions</div>
+  <div id="results"></div>
+</div>
+
+<div class="footer">
+  Part of <a href="https://yurukusa.github.io/cc-toolkit/">cc-toolkit</a> — 92 tools for Claude Code &nbsp;|&nbsp;
+  <a href="https://github.com/yurukusa/cc-bash-type">GitHub</a> &nbsp;|&nbsp;
+  <a href="https://www.npmjs.com/package/cc-bash-type">npm</a>
+</div>
+
+<script>
+const SAMPLE = {
+  sessions: 1835,
+  totalBash: 54636,
+  categories: [
+    { key: 'shell',    label: 'shell',    pct: 30.8, count: 16839, color: '#484f58', desc: 'echo, sleep, export', top3: 'sleep(3822) echo(3500) export(1892)' },
+    { key: 'inspect',  label: 'inspect',  pct: 25.3, count: 13834, color: '#58a6ff', desc: 'cat, grep, find, ls', top3: 'cat(5198) grep(4516) ls(2241)' },
+    { key: 'execute',  label: 'execute',  pct: 15.2, count:  8312, color: '#3fb950', desc: 'node, python, bash',  top3: 'python3(3790) node(1241) bash(892)' },
+    { key: 'file_ops', label: 'file_ops', pct:  9.6, count:  5238, color: '#e3b341', desc: 'cp, mv, rm, mkdir',   top3: 'mkdir(2108) cp(891) rm(748)' },
+    { key: 'git',      label: 'git',      pct:  7.5, count:  4102, color: '#f0883e', desc: 'git *',               top3: 'git add(624) git log(323) git push(161)' },
+    { key: 'package',  label: 'package',  pct:  5.3, count:  2894, color: '#a371f7', desc: 'npm, pip, yarn',      top3: 'npm(1482) pip(894) pip3(518)' },
+    { key: 'network',  label: 'network',  pct:  2.3, count:  1248, color: '#79c0ff', desc: 'curl, wget, ssh',     top3: 'curl(1098) wget(150)' },
+    { key: 'test',     label: 'test',     pct:  1.5, count:   821, color: '#56d364', desc: 'pytest, jest, vitest',top3: 'pytest(412) jest(214) vitest(195)' },
+    { key: 'other',    label: 'other',    pct:  2.5, count:  1348, color: '#30363d', desc: '', top3: '' },
+  ],
+  gitSubs: [
+    { sub: 'add',      count: 624 },
+    { sub: 'log',      count: 323 },
+    { sub: 'status',   count: 162 },
+    { sub: 'push',     count: 161 },
+    { sub: 'commit',   count:  82 },
+    { sub: 'diff',     count:  78 },
+    { sub: 'checkout', count:  71 },
+    { sub: 'branch',   count:  42 },
+  ],
+};
+
+const INSIGHTS = [
+  '<strong>Shell utils dominate (31%)</strong> — sleep, echo, export: orchestration overhead is everywhere. The hidden cost of automation.',
+  '<strong>Inspect is 25%</strong> — cat, grep, ls. Claude reads and searches before it acts. Bash is often just another way to read.',
+  '<strong>Execute is 15%</strong> — python3, node, bash. Running actual code comes third, after reading and shell plumbing.',
+  '<strong>Git is 8%</strong> — version control is a consistent, predictable part of every Claude Code workflow.',
+  '<strong>Package management is 5%</strong> — npm and pip installs happen, but rarely. Most sessions work with what\'s already installed.',
+  '<strong>Test runners are only 1.5%</strong> — pytest, jest, vitest. Explicit test execution is surprisingly rare in raw sessions.',
+];
+
+function renderAll(d) {
+  const { sessions, totalBash, categories, gitSubs } = d;
+  const maxCount = Math.max(...categories.map(c => c.count));
+
+  const catHtml = categories.map(c => {
+    const w = maxCount > 0 ? (c.count / maxCount * 100).toFixed(1) : 0;
+    return `<div class="cat-row">
+      <div class="cat-label">${c.label}</div>
+      <div class="cat-right">
+        <div class="cat-track">
+          <div class="cat-fill" style="width:${w}%;background:${c.color}"></div>
+          <div class="cat-pct">${c.count.toLocaleString()} · ${c.pct}%</div>
+        </div>
+        ${c.top3 ? `<div class="cat-cmds">${c.top3}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const gitHtml = gitSubs.map(g => `
+    <div class="git-row">
+      <span class="git-sub">git ${g.sub}</span>
+      <span class="git-count">${g.count.toLocaleString()}</span>
+    </div>`).join('');
+
+  const insHtml = INSIGHTS.map(i => `<li>${i}</li>`).join('');
+
+  document.getElementById('results').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">${totalBash.toLocaleString()}</div><div class="stat-lbl">total Bash calls</div></div>
+      <div class="stat-box"><div class="stat-val">25%</div><div class="stat-lbl">inspect (cat/grep/ls)</div></div>
+      <div class="stat-box"><div class="stat-val">15%</div><div class="stat-lbl">execute (node/python)</div></div>
+      <div class="stat-box"><div class="stat-val">8%</div><div class="stat-lbl">git operations</div></div>
+    </div>
+    <div class="card insight">
+      <div class="card-title">Key findings — ${sessions.toLocaleString()} sessions, ${totalBash.toLocaleString()} Bash calls classified</div>
+      <ul>${insHtml}</ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Command Category Distribution</div>
+      <div class="card-sub">Each Bash call classified by intent. Top 3 commands shown per category.</div>
+      ${catHtml}
+    </div>
+    <div class="card">
+      <div class="card-title">Git Subcommands</div>
+      <div class="card-sub">Breakdown of all git * operations</div>
+      ${gitHtml}
+    </div>`;
+}
+
+// ── JSONL parsing ─────────────────────────────────────────────────
+const CAT_RULES = [
+  { key: 'git',     cmds: new Set(['git']) },
+  { key: 'package', cmds: new Set(['npm','npx','pip','pip3','yarn','pnpm','bun','cargo','brew','apt','apt-get','gem','poetry','conda']) },
+  { key: 'execute', cmds: new Set(['node','python','python3','python2','ruby','tsx','ts-node','deno','php','go','java','bash','sh','zsh','fish']) },
+  { key: 'test',    cmds: new Set(['pytest','jest','vitest','mocha','jasmine','karma','ava','tap','playwright','cypress']) },
+  { key: 'network', cmds: new Set(['curl','wget','ssh','scp','rsync','ping','nc','netcat','http']) },
+  { key: 'inspect', cmds: new Set(['cat','head','tail','grep','find','ls','ll','wc','less','diff','stat','file','which','readlink']) },
+  { key: 'file_ops',cmds: new Set(['cp','mv','rm','mkdir','touch','chmod','chown','ln','tar','zip','unzip','gzip','mktemp']) },
+  { key: 'shell',   cmds: new Set(['echo','sleep','export','source','env','pwd','date','printf','read','eval','kill','timeout','time','nohup']) },
+];
+function catOf(cmd) {
+  if (!cmd) return 'other';
+  const base = cmd.trim().split(/\s+/)[0].toLowerCase().replace(/^.*\//, '');
+  for (const r of CAT_RULES) if (r.cmds.has(base)) return r.key;
+  return 'other';
+}
+function gitSub(cmd) {
+  const p = cmd.trim().split(/\s+/);
+  if (p[0].toLowerCase().replace(/^.*\//,'') !== 'git') return null;
+  return p[1]?.toLowerCase() || null;
+}
+
+async function processFiles(files) {
+  const jsonlFiles = [...files].filter(f => f.name.endsWith('.jsonl'));
+  document.getElementById('status').textContent = `Processing ${jsonlFiles.length} session files…`;
+
+  const catCounts = {};
+  const catTopCmds = {};
+  const gitSubs = {};
+  const CATS = ['git','package','execute','test','network','inspect','file_ops','shell','other'];
+  CATS.forEach(k => { catCounts[k]=0; catTopCmds[k]={}; });
+  let totalBash=0, sessions=0;
+
+  for (const file of jsonlFiles) {
+    const text = await file.text();
+    let fileBash = 0;
+    for (const line of text.split('\n')) {
+      if (!line.includes('"Bash"')) continue;
+      try {
+        const obj = JSON.parse(line);
+        const content = (obj.message||obj).content;
+        if (!Array.isArray(content)) continue;
+        for (const b of content) {
+          if (b.type!=='tool_use'||b.name!=='Bash'||!b.input) continue;
+          const cmd = b.input.command||'';
+          if (!cmd.trim()) continue;
+          fileBash++; totalBash++;
+          const cat = catOf(cmd);
+          catCounts[cat]++;
+          const first = cmd.trim().split(/\s+/)[0].toLowerCase().replace(/^.*\//,'');
+          catTopCmds[cat][first]=(catTopCmds[cat][first]||0)+1;
+          const sub = gitSub(cmd);
+          if (sub) gitSubs[sub]=(gitSubs[sub]||0)+1;
+        }
+      } catch {}
+    }
+    if (fileBash>=3) sessions++;
+  }
+
+  const COLORS = {git:'#f0883e',package:'#a371f7',execute:'#3fb950',test:'#56d364',network:'#79c0ff',inspect:'#58a6ff',file_ops:'#e3b341',shell:'#484f58',other:'#30363d'};
+  const categories = CATS.map(k => ({
+    key: k, label: k, pct: +(catCounts[k]/totalBash*100).toFixed(1), count: catCounts[k],
+    color: COLORS[k]||'#30363d',
+    top3: Object.entries(catTopCmds[k]).sort(([,a],[,b])=>b-a).slice(0,3).map(([c,n])=>`${c}(${n})`).join(' '),
+    desc: '',
+  })).sort((a,b)=>b.count-a.count);
+
+  const gitSubsArr = Object.entries(gitSubs).sort(([,a],[,b])=>b-a).slice(0,8).map(([sub,count])=>({sub,count}));
+  document.getElementById('status').textContent = `Analyzed ${sessions.toLocaleString()} sessions`;
+  renderAll({ sessions, totalBash, categories, gitSubs: gitSubsArr });
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+renderAll(SAMPLE);
+
+const dz = document.getElementById('dropZone');
+const fi = document.getElementById('fileInput');
+dz.addEventListener('click', () => fi.click());
+fi.addEventListener('change', () => { if (fi.files.length) processFiles(fi.files); });
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const allFiles = [];
+  let pending = 0;
+  function traverse(entry) {
+    if (entry.isFile) {
+      pending++;
+      entry.file(f => { allFiles.push(f); if (--pending === 0) processFiles(allFiles); });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      function readAll() { reader.readEntries(entries => { if (!entries.length) return; entries.forEach(traverse); readAll(); }); }
+      readAll();
+    }
+  }
+  for (const item of e.dataTransfer.items) { const e2 = item.webkitGetAsEntry(); if (e2) traverse(e2); }
+  dz.classList.add('loaded');
+  dz.querySelector('div').textContent = '✓ Loading your data…';
+});
+</script>
+</body>
+</html>

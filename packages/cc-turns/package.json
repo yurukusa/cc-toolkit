@@ -1,0 +1,26 @@
+{
+  "name": "cc-turns",
+  "version": "1.0.0",
+  "description": "Analyze user turn count per Claude Code session — fire-and-forget vs collaborative patterns, and how interventions correlate with tool usage",
+  "type": "module",
+  "bin": {
+    "cc-turns": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude", "claude-code", "anthropic", "cli", "productivity",
+    "ai", "developer-tools", "session-analysis", "collaboration", "workflow"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-turns"
+  },
+  "homepage": "https://yurukusa.github.io/cc-turns/"
+}

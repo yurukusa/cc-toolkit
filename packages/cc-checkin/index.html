@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cc-checkin — When does your human check in?</title>
+<style>
+  :root {
+    --bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--dim:#8b949e;
+    --green:#3fb950;--yellow:#d29922;--blue:#58a6ff;--purple:#bc8cff;--orange:#ffa657;--accent:#58a6ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;padding:2rem 1rem;}
+  .container{max-width:780px;margin:0 auto;}
+  h1{font-size:1.5rem;font-weight:700;margin-bottom:.25rem;}
+  h1 span{color:var(--accent);}
+  .subtitle{color:var(--dim);font-size:.9rem;margin-bottom:2rem;}
+  .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:2.5rem;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:2rem;}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent);background:#0d1422;}
+  .upload-zone p{color:var(--dim);font-size:.9rem;margin-top:.5rem;}
+  .upload-btn{background:var(--accent);color:#0d1117;border:none;padding:.5rem 1.2rem;border-radius:6px;cursor:pointer;font-weight:600;font-size:.9rem;}
+  .demo-btn{background:transparent;border:1px solid var(--border);color:var(--dim);padding:.4rem 1rem;border-radius:6px;cursor:pointer;font-size:.85rem;margin-top:.75rem;}
+  .demo-btn:hover{border-color:var(--accent);color:var(--text);}
+  #results{display:none;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem 1.5rem;margin-bottom:1rem;}
+  .card-title{font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);margin-bottom:.75rem;}
+  .big-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1rem;}
+  .stat-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center;}
+  .stat-val{font-size:1.6rem;font-weight:800;line-height:1;}
+  .stat-key{font-size:.75rem;color:var(--dim);margin-top:.3rem;}
+  .bar-row{display:flex;align-items:center;gap:.75rem;margin-bottom:.6rem;font-size:.85rem;}
+  .bar-label{width:90px;color:var(--dim);flex-shrink:0;}
+  .bar-track{flex:1;height:10px;background:var(--border);border-radius:5px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:5px;transition:width .6s ease;}
+  .bar-pct{width:42px;text-align:right;font-weight:600;}
+  .bar-count{width:55px;color:var(--dim);font-size:.78rem;}
+  .top-item{display:flex;align-items:center;gap:.75rem;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.85rem;}
+  .top-item:last-child{border:none;}
+  .top-rank{width:28px;color:var(--dim);font-size:.8rem;}
+  .top-rate{font-weight:700;color:var(--purple);min-width:80px;}
+  .top-detail{color:var(--dim);}
+  .insight{background:#0d1422;border:1px solid var(--blue);border-radius:8px;padding:1rem 1.25rem;font-size:.9rem;line-height:1.5;margin-bottom:1rem;}
+  .path-hint{background:#1e1a0c;border:1px solid var(--border);border-radius:6px;padding:.6rem 1rem;font-size:.8rem;color:var(--dim);font-family:monospace;margin-bottom:2rem;}
+  .trust-row{display:flex;gap:1rem;margin-bottom:.5rem;}
+  .trust-stat{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:.75rem;text-align:center;}
+  .trust-val{font-size:1.3rem;font-weight:800;}
+  .trust-key{font-size:.75rem;color:var(--dim);margin-top:.25rem;}
+  @media(max-width:540px){.big-stats{grid-template-columns:1fr 1fr;}.trust-row{flex-direction:column;}}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><span>cc-checkin</span></h1>
+  <p class="subtitle">When does your human check in?</p>
+  <div class="path-hint">📁 ~/.claude/projects/&lt;project&gt;/*.jsonl — drag files below</div>
+  <div class="upload-zone" id="dz">
+    <button class="upload-btn" onclick="document.getElementById('fi').click()">Upload JSONL files</button>
+    <p>or drag and drop from ~/.claude/projects/</p><br>
+    <button class="demo-btn" onclick="loadDemo()">Try with demo data</button>
+    <input type="file" id="fi" accept=".jsonl" multiple style="display:none" onchange="handleFiles(this.files)">
+  </div>
+  <div id="results">
+    <div class="big-stats">
+      <div class="stat-box"><div class="stat-val" id="vSessions" style="color:var(--blue)">—</div><div class="stat-key">sessions</div></div>
+      <div class="stat-box"><div class="stat-val" id="vAuto" style="color:var(--green)">—</div><div class="stat-key">% autonomous</div></div>
+      <div class="stat-box"><div class="stat-val" id="vCheckins" style="color:var(--yellow)">—</div><div class="stat-key">total check-ins</div></div>
+      <div class="stat-box"><div class="stat-val" id="vAvg" style="color:var(--purple)">—</div><div class="stat-key">avg / session</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">When do check-ins happen?</div>
+      <div class="bar-row"><span class="bar-label">early (0–33%)</span><div class="bar-track"><div class="bar-fill" id="bEarly" style="background:var(--yellow)"></div></div><span class="bar-pct" id="pEarly">—</span><span class="bar-count" id="cEarly"></span></div>
+      <div class="bar-row"><span class="bar-label">mid (33–67%)</span><div class="bar-track"><div class="bar-fill" id="bMid" style="background:var(--blue)"></div></div><span class="bar-pct" id="pMid">—</span><span class="bar-count" id="cMid"></span></div>
+      <div class="bar-row"><span class="bar-label">late (67–100%)</span><div class="bar-track"><div class="bar-fill" id="bLate" style="background:var(--purple)"></div></div><span class="bar-pct" id="pLate">—</span><span class="bar-count" id="cLate"></span></div>
+      <p style="font-size:.75rem;color:var(--dim);margin-top:.75rem">Position of each human follow-up message within the session timeline</p>
+    </div>
+    <div class="card">
+      <div class="card-title">Trust duration — before first check-in</div>
+      <div class="trust-row">
+        <div class="trust-stat"><div class="trust-val" id="tMedian" style="color:var(--green)">—</div><div class="trust-key">median</div></div>
+        <div class="trust-stat"><div class="trust-val" id="tMax" style="color:var(--purple)">—</div><div class="trust-key">max (longest solo run)</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Longest trust runs</div>
+      <div id="topList"></div>
+    </div>
+    <div id="insightBox"></div>
+  </div>
+</div>
+<script>
+const dz=document.getElementById('dz');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');handleFiles(e.dataTransfer.files);});
+function handleFiles(files){
+  Promise.all([...files].map(f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.onerror=rej;r.readAsText(f);})))
+    .then(texts=>analyze(texts.join('\n')));
+}
+function fmtMin(m){return m>=60?(m/60).toFixed(1)+'h':Math.round(m)+'min';}
+function analyze(raw){
+  const sessionMap={};
+  for(const line of raw.split('\n')){
+    if(!line)continue;
+    let d;try{d=JSON.parse(line);}catch{continue;}
+    const sid=d.sessionId||d.session_id||'x';
+    if(!sessionMap[sid])sessionMap[sid]={events:[],firstUserTs:null};
+    if(d.timestamp){
+      const t=new Date(d.timestamp).getTime();
+      if(!isNaN(t)){
+        const msg=d.message||d;
+        if(msg&&msg.role==='user'){
+          const content=Array.isArray(msg.content)?msg.content:[];
+          const hasText=content.some(c=>c&&c.type==='text');
+          if(hasText){
+            if(sessionMap[sid].firstUserTs===null){sessionMap[sid].firstUserTs=t;}
+            else{sessionMap[sid].events.push({t,type:'checkin'});}
+          }
+        }
+        sessionMap[sid].events.push({t,type:'any'});
+      }
+    }
+  }
+  const sessions=[];
+  for(const s of Object.values(sessionMap)){
+    if(s.firstUserTs===null)continue;
+    const allTs=s.events.map(e=>e.t);
+    if(allTs.length<2)continue;
+    let minTs=s.firstUserTs,maxTs=allTs[0];
+    for(const t of allTs){if(t>maxTs)maxTs=t;}
+    const dur=(maxTs-minTs)/60000;
+    if(dur<1)continue;
+    const checkins=s.events.filter(e=>e.type==='checkin').sort((a,b)=>a.t-b.t);
+    if(checkins.length===0){sessions.push({autonomous:true,dur,checkins:[]});continue;}
+    const durationMs=maxTs-minTs;
+    const positions=checkins.map(c=>(c.t-minTs)/durationMs);
+    const firstPos=positions[0];
+    const trustMin=(checkins[0].t-minTs)/60000;
+    sessions.push({autonomous:false,dur,checkins:positions,count:checkins.length,firstPos,trustMin});
+  }
+  if(!sessions.length){alert('No sessions found.');return;}
+  const n=sessions.length;
+  const auto=sessions.filter(s=>s.autonomous).length;
+  const inter=sessions.filter(s=>!s.autonomous);
+  const allPos=inter.flatMap(s=>s.checkins).filter(p=>p>=0&&p<=1);
+  const early=allPos.filter(p=>p<0.333).length;
+  const mid=allPos.filter(p=>p>=0.333&&p<0.667).length;
+  const late=allPos.filter(p=>p>=0.667).length;
+  const total=allPos.length;
+  const trusts=inter.filter(s=>s.trustMin!==undefined).map(s=>s.trustMin).sort((a,b)=>a-b);
+  const medT=trusts.length?trusts[Math.floor(trusts.length/2)]:0;
+  const maxT=trusts.length?trusts[trusts.length-1]:0;
+  const avg=inter.length?inter.reduce((a,s)=>a+(s.count||0),0)/inter.length:0;
+  const topT=[...inter].filter(s=>s.trustMin!==undefined).sort((a,b)=>b.trustMin-a.trustMin).slice(0,3);
+  render({n,auto,total,early,mid,late,medT,maxT,avg,topT});
+}
+function hn(n){return n>=1e3?(n/1e3).toFixed(1)+'K':Math.round(n).toLocaleString();}
+function pct(a,t){return t?Math.round(a/t*100):0;}
+function render(d){
+  document.getElementById('results').style.display='block';
+  document.getElementById('vSessions').textContent=hn(d.n);
+  document.getElementById('vAuto').textContent=pct(d.auto,d.n)+'%';
+  document.getElementById('vCheckins').textContent=hn(d.total);
+  document.getElementById('vAvg').textContent=d.avg.toFixed(1);
+  const sb=(bId,pId,cId,n)=>{const p=pct(n,d.total);document.getElementById(bId).style.width=p+'%';document.getElementById(pId).textContent=p+'%';document.getElementById(cId).textContent='('+n+')'};
+  sb('bEarly','pEarly','cEarly',d.early);sb('bMid','pMid','cMid',d.mid);sb('bLate','pLate','cLate',d.late);
+  document.getElementById('tMedian').textContent=fmtMin(d.medT);
+  document.getElementById('tMax').textContent=fmtMin(d.maxT);
+  document.getElementById('topList').innerHTML=d.topT.map((s,i)=>`<div class="top-item"><span class="top-rank">#${i+1}</span><span class="top-rate">${fmtMin(s.trustMin)} solo</span><span class="top-detail">checked in at ${Math.round(s.firstPos*100)}% of ${fmtMin(s.dur)} session</span></div>`).join('');
+  document.getElementById('insightBox').innerHTML=`<div class="insight"><strong>${pct(d.auto,d.n)}% of sessions run completely uninterrupted.</strong><br>Of the check-ins that do happen, ${pct(d.late,d.total)}% occur in the last third — most humans review results, not process.<br>Median trust duration: ${fmtMin(d.medT)} before the human looks in.</div>`;
+}
+function loadDemo(){render({n:162,auto:48,total:939,early:290,mid:246,late:403,medT:9,maxT:948,avg:8.2,topT:[{trustMin:948,firstPos:0.77,dur:1230},{trustMin:726,firstPos:0.99,dur:732},{trustMin:702,firstPos:0.71,dur:990}]});}
+</script>
+</body>
+</html>

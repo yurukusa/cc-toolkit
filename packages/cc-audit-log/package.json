@@ -1,0 +1,33 @@
+{
+  "name": "cc-audit-log",
+  "version": "1.0.0",
+  "description": "See what your Claude Code actually did. Human-readable audit trail from session transcripts.",
+  "bin": {
+    "cc-audit-log": "./cli.mjs"
+  },
+  "type": "module",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai",
+    "audit",
+    "log",
+    "session",
+    "monitoring",
+    "autonomous"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-audit-log"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ]
+}

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cc-human — What does your human actually do?</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --dim: #8b949e;
+    --green: #3fb950;
+    --yellow: #d29922;
+    --blue: #58a6ff;
+    --purple: #bc8cff;
+    --red: #f85149;
+    --accent: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: .25rem; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--dim); font-size: .9rem; margin-bottom: 2rem; }
+
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 2.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    margin-bottom: 2rem;
+  }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #1c2230; }
+  .upload-zone p { color: var(--dim); font-size: .9rem; margin-top: .5rem; }
+  .upload-btn { background: var(--accent); color: #0d1117; border: none; padding: .5rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: .9rem; }
+
+  .demo-btn { background: transparent; border: 1px solid var(--border); color: var(--dim); padding: .4rem 1rem; border-radius: 6px; cursor: pointer; font-size: .85rem; margin-top: .75rem; }
+  .demo-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  #results { display: none; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+  .card-title { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: .75rem; }
+
+  .big-split { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .split-block { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; text-align: center; }
+  .split-num { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+  .split-label { font-size: .8rem; color: var(--dim); margin-top: .4rem; }
+  .split-desc { font-size: .75rem; color: var(--dim); margin-top: .2rem; }
+
+  .bar-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .6rem; font-size: .85rem; }
+  .bar-label { width: 90px; color: var(--dim); flex-shrink: 0; }
+  .bar-track { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; transition: width .6s ease; }
+  .bar-pct { width: 42px; text-align: right; font-weight: 600; }
+  .bar-count { width: 50px; color: var(--dim); font-size: .78rem; }
+
+  .stat-row { display: flex; gap: 2rem; flex-wrap: wrap; }
+  .stat { display: flex; flex-direction: column; }
+  .stat-val { font-size: 1.4rem; font-weight: 700; }
+  .stat-key { font-size: .78rem; color: var(--dim); }
+
+  .insight { background: #0f2318; border: 1px solid #3fb950; border-radius: 8px; padding: 1rem 1.25rem; font-size: .9rem; line-height: 1.5; margin-bottom: 1rem; }
+  .insight.yellow { background: #1e1a0c; border-color: var(--yellow); }
+
+  .path-hint { background: #1e1a0c; border: 1px solid var(--border); border-radius: 6px; padding: .6rem 1rem; font-size: .8rem; color: var(--dim); font-family: monospace; margin-bottom: 2rem; }
+
+  @media (max-width: 540px) {
+    .big-split { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><span>cc-human</span></h1>
+  <p class="subtitle">What does your human actually do during a Claude Code session?</p>
+
+  <div class="path-hint">📁 ~/.claude/projects/&lt;project&gt;/*.jsonl — drag and drop one or more files below</div>
+
+  <div class="upload-zone" id="dropZone">
+    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">Upload JSONL files</button>
+    <p>or drag and drop from ~/.claude/projects/</p>
+    <br>
+    <button class="demo-btn" onclick="loadDemo()">Try with demo data</button>
+    <input type="file" id="fileInput" accept=".jsonl" multiple style="display:none" onchange="handleFiles(this.files)">
+  </div>
+
+  <div id="results">
+    <div class="big-split">
+      <div class="split-block">
+        <div class="split-num" id="autoPct" style="color: var(--green)">—</div>
+        <div class="split-label">pure-autonomous</div>
+        <div class="split-desc">human writes once, CC does the rest</div>
+      </div>
+      <div class="split-block">
+        <div class="split-num" id="interPct" style="color: var(--yellow)">—</div>
+        <div class="split-label">interactive</div>
+        <div class="split-desc">human sends follow-up messages</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Session overview</div>
+      <div class="stat-row">
+        <div class="stat"><div class="stat-val" id="totalSessions">—</div><div class="stat-key">sessions</div></div>
+        <div class="stat"><div class="stat-val" id="medMsgs">—</div><div class="stat-key">median msgs/session</div></div>
+        <div class="stat"><div class="stat-val" id="meanMsgs">—</div><div class="stat-key">mean msgs/session</div></div>
+        <div class="stat"><div class="stat-val" id="maxMsgs">—</div><div class="stat-key">max msgs in 1 session</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Initial prompt length</div>
+      <div class="stat-row">
+        <div class="stat"><div class="stat-val" id="medFirst">—</div><div class="stat-key">median chars</div></div>
+        <div class="stat"><div class="stat-val" id="meanFirst">—</div><div class="stat-key">mean chars</div></div>
+      </div>
+    </div>
+
+    <div class="card" id="followupCard">
+      <div class="card-title">Follow-up message types <span id="followupTotal" style="color:var(--dim);font-weight:400"></span></div>
+      <div class="bar-row">
+        <span class="bar-label">ack</span>
+        <div class="bar-track"><div class="bar-fill" id="barAck" style="background:var(--blue)"></div></div>
+        <span class="bar-pct" id="pctAck">—</span>
+        <span class="bar-count" id="cntAck"></span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">direction</span>
+        <div class="bar-track"><div class="bar-fill" id="barDir" style="background:var(--green)"></div></div>
+        <span class="bar-pct" id="pctDir">—</span>
+        <span class="bar-count" id="cntDir"></span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">correction</span>
+        <div class="bar-track"><div class="bar-fill" id="barCorr" style="background:var(--yellow)"></div></div>
+        <span class="bar-pct" id="pctCorr">—</span>
+        <span class="bar-count" id="cntCorr"></span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">briefing</span>
+        <div class="bar-track"><div class="bar-fill" id="barBrief" style="background:var(--purple)"></div></div>
+        <span class="bar-pct" id="pctBrief">—</span>
+        <span class="bar-count" id="cntBrief"></span>
+      </div>
+      <p style="font-size:.75rem;color:var(--dim);margin-top:.75rem">
+        ack &lt;30c &nbsp;|&nbsp; direction 30–149c &nbsp;|&nbsp; correction 150–599c &nbsp;|&nbsp; briefing 600+c
+      </p>
+    </div>
+
+    <div id="insightBox"></div>
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+function handleFiles(files) {
+  const readers = [...files].map(f => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.onerror = rej;
+    r.readAsText(f);
+  }));
+  Promise.all(readers).then(texts => analyze(texts.join('\n')));
+}
+
+function analyze(raw) {
+  const lines = raw.split('\n');
+  const sessions = {};
+
+  for (const line of lines) {
+    if (!line.includes('"user"')) continue;
+    let d;
+    try { d = JSON.parse(line); } catch { continue; }
+    const msg = d.message || d;
+    if (!msg || msg.role !== 'user') continue;
+    const content = msg.content;
+    if (!Array.isArray(content)) continue;
+
+    const texts = [];
+    for (const c of content) {
+      if (!c || typeof c !== 'object') continue;
+      if (c.type === 'text') {
+        const t = (c.text || '').trim();
+        if (t.length > 5) texts.push(t);
+      }
+    }
+    if (!texts.length) continue;
+
+    const sid = d.sessionId || d.session_id || Math.random().toString();
+    if (!sessions[sid]) sessions[sid] = [];
+    sessions[sid].push(texts.join(' '));
+  }
+
+  const sessionList = Object.values(sessions);
+  if (!sessionList.length) { alert('No human messages found in uploaded files.'); return; }
+
+  let pureAuto = 0, inter = 0;
+  const msgsArr = [], firstArr = [], followArr = [];
+
+  for (const msgs of sessionList) {
+    msgsArr.push(msgs.length);
+    firstArr.push(msgs[0].length);
+    if (msgs.length === 1) pureAuto++;
+    else {
+      inter++;
+      for (let i = 1; i < msgs.length; i++) followArr.push(msgs[i].length);
+    }
+  }
+
+  msgsArr.sort((a,b)=>a-b); firstArr.sort((a,b)=>a-b); followArr.sort((a,b)=>a-b);
+  const total = sessionList.length;
+  const medM = msgsArr[Math.floor(msgsArr.length/2)];
+  const meanM = (msgsArr.reduce((a,b)=>a+b,0)/msgsArr.length).toFixed(1);
+  const maxM = msgsArr[msgsArr.length-1];
+  const medF1 = firstArr[Math.floor(firstArr.length/2)];
+  const meanF1 = Math.round(firstArr.reduce((a,b)=>a+b,0)/firstArr.length);
+
+  const ft = followArr.length;
+  const fAck  = followArr.filter(x=>x<30).length;
+  const fDir  = followArr.filter(x=>x>=30&&x<150).length;
+  const fCorr = followArr.filter(x=>x>=150&&x<600).length;
+  const fBrief= followArr.filter(x=>x>=600).length;
+  const medFU = ft>0 ? followArr[Math.floor(ft/2)] : 0;
+
+  render({ total, pureAuto, inter, medM, meanM, maxM, medF1, meanF1, ft, fAck, fDir, fCorr, fBrief, medFU });
+}
+
+function pct(n, total) { return total ? Math.round(n/total*100) : 0; }
+function num(n) { return n >= 1000 ? (n/1000).toFixed(1)+'K' : n; }
+
+function render(d) {
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('autoPct').textContent = pct(d.pureAuto, d.total) + '%';
+  document.getElementById('interPct').textContent = pct(d.inter, d.total) + '%';
+  document.getElementById('totalSessions').textContent = num(d.total);
+  document.getElementById('medMsgs').textContent = d.medM;
+  document.getElementById('meanMsgs').textContent = d.meanM;
+  document.getElementById('maxMsgs').textContent = d.maxM;
+  document.getElementById('medFirst').textContent = d.medF1;
+  document.getElementById('meanFirst').textContent = d.meanF1;
+
+  if (d.ft > 0) {
+    document.getElementById('followupTotal').textContent = `(${num(d.ft)} total, median ${d.medFU}c)`;
+    const setBar = (id, pId, cId, n) => {
+      const p = pct(n, d.ft);
+      document.getElementById(id).style.width = p + '%';
+      document.getElementById(pId).textContent = p + '%';
+      document.getElementById(cId).textContent = '(' + n + ')';
+    };
+    setBar('barAck', 'pctAck', 'cntAck', d.fAck);
+    setBar('barDir', 'pctDir', 'cntDir', d.fDir);
+    setBar('barCorr', 'pctCorr', 'cntCorr', d.fCorr);
+    setBar('barBrief', 'pctBrief', 'cntBrief', d.fBrief);
+  }
+
+  const autoPct = pct(d.pureAuto, d.total);
+  const box = document.getElementById('insightBox');
+  if (autoPct >= 60) {
+    box.innerHTML = `<div class="insight">
+      <strong>${autoPct}% of sessions: human writes once and walks away.</strong><br>
+      Claude Code runs the rest autonomously. ${d.medM === 1 ? 'Median session: 1 human message.' : ''}
+    </div>`;
+  } else if (autoPct >= 35) {
+    box.innerHTML = `<div class="insight yellow">
+      <strong>${autoPct}% pure-autonomous</strong> — growing toward hands-free operation.<br>
+      ${pct(d.inter, d.total)}% of sessions still need human follow-up.
+    </div>`;
+  } else {
+    box.innerHTML = `<div class="insight yellow">
+      <strong>${pct(d.inter, d.total)}% interactive sessions.</strong><br>
+      Your human is actively guiding most sessions. Consider if more autonomy is possible.
+    </div>`;
+  }
+}
+
+function loadDemo() {
+  const demo = {
+    totalSessions: 183, pureAuto: 65, inter: 118,
+    medM: 2, meanM: '6.1', maxM: 87,
+    medF1: 42, meanF1: 1466,
+    ft: 941, fAck: 249, fDir: 653, fCorr: 1, fBrief: 38, medFU: 42
+  };
+  render(demo);
+}
+</script>
+</body>
+</html>

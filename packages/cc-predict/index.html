@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cc-predict — Month-End Forecast</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px; }
+
+  h1 { font-family: monospace; font-size: 1.3rem; color: #58a6ff; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 32px; }
+
+  .picker-btn { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s; margin-bottom: 24px; }
+  .picker-btn:hover { background: #30363d; }
+  #fileInput { display: none; }
+
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px; width: 100%; max-width: 560px; }
+
+  .month-header { font-family: monospace; font-size: 0.9rem; color: #8b949e; margin-bottom: 20px; }
+
+  .section { margin-bottom: 20px; }
+  .section-title { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #8b949e; margin-bottom: 10px; }
+
+  .forecast-row { display: flex; align-items: center; gap: 0; margin-bottom: 8px; font-size: 0.88rem; }
+  .row-label { width: 100px; color: #8b949e; font-size: 0.82rem; flex-shrink: 0; }
+  .row-bar { flex: 1; height: 6px; background: #21262d; border-radius: 3px; overflow: hidden; margin: 0 10px; }
+  .bar-actual { height: 100%; border-radius: 3px; }
+  .bar-projected { height: 100%; border-radius: 3px; opacity: 0.45; }
+  .row-value { font-family: monospace; font-size: 0.82rem; min-width: 60px; text-align: right; }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .stat-cell { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 12px; }
+  .stat-now { font-size: 0.72rem; color: #8b949e; margin-bottom: 2px; }
+  .stat-proj { font-family: monospace; font-size: 1.2rem; font-weight: 700; }
+  .stat-label { font-size: 0.75rem; color: #8b949e; margin-top: 2px; }
+
+  .confidence-bar { display: flex; gap: 3px; margin-top: 6px; }
+  .conf-block { width: 14px; height: 8px; border-radius: 2px; background: #21262d; }
+  .conf-filled { background: #238636; }
+  .conf-med { background: #e3b341; }
+  .conf-low { background: #e05d44; }
+
+  .streak-forecast { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 14px; margin-top: 10px; font-family: monospace; font-size: 0.85rem; }
+  .streak-line { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .streak-label { color: #8b949e; }
+  .streak-val { color: #e6edf3; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: #8b949e; }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.88rem; line-height: 1.6; }
+
+  .hint { font-size: 0.78rem; color: #8b949e; text-align: center; margin-top: 16px; }
+  .hint a { color: #58a6ff; text-decoration: none; }
+
+  .divider { border-top: 1px solid #21262d; margin: 16px 0; }
+  .note { font-size: 0.75rem; color: #8b949e; margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<h1>cc-predict</h1>
+<p class="subtitle">Where will your AI stats land by month-end? Select ~/.claude to forecast.</p>
+
+<label class="picker-btn" for="fileInput">
+  📁 Select ~/.claude Folder
+</label>
+<input type="file" id="fileInput" webkitdirectory multiple>
+
+<div class="card" id="card">
+  <div class="empty-state">
+    <div class="icon">🔮</div>
+    <p>Select your <strong>~/.claude</strong> folder to see your month-end forecast.</p>
+    <br>
+    <p style="color:#8b949e;font-size:0.8rem;">Projects your streak, hours, and Ghost Days based on the last 14 days of activity.</p>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:16px;">Also available as CLI: <a href="https://github.com/yurukusa/cc-predict" target="_blank">npx cc-predict</a> · Part of <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit</a></p>
+
+<script>
+// ── Date helpers ──────────────────────────────────────────────────────────────
+function toLocalDate(d) { return d.toLocaleDateString('sv-SE'); }
+function today() { return toLocalDate(new Date()); }
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return toLocalDate(d);
+}
+function monthStart(dateStr) {
+  return dateStr.slice(0, 7) + '-01';
+}
+function daysInMonth(dateStr) {
+  const [y, m] = dateStr.split('-').map(Number);
+  return new Date(y, m, 0).getDate();
+}
+function dayOfMonth(dateStr) {
+  return parseInt(dateStr.split('-')[2]);
+}
+
+// ── JSONL reading ─────────────────────────────────────────────────────────────
+async function readFirstLast(file) {
+  const CHUNK = 4096;
+  const size = file.size;
+  if (size === 0) return null;
+  try {
+    const headText = new TextDecoder().decode(await file.slice(0, Math.min(CHUNK, size)).arrayBuffer());
+    const firstLine = headText.split('\n').find(l => l.trim());
+    if (!firstLine) return null;
+    const tailText = new TextDecoder().decode(await file.slice(Math.max(0, size - CHUNK)).arrayBuffer());
+    const lastLine = tailText.split('\n').filter(l => l.trim()).pop() || firstLine;
+    const parseTs = l => { try { return new Date(JSON.parse(l).timestamp || '').getTime() || null; } catch { return null; } };
+    const first = parseTs(firstLine), last = parseTs(lastLine);
+    return (first && last) ? { first, last } : null;
+  } catch { return null; }
+}
+
+async function loadByDate(files) {
+  const byDate = {};
+  const jsonlFiles = Array.from(files).filter(f => {
+    const p = f.webkitRelativePath || f.name;
+    return p.endsWith('.jsonl') && p.includes('/projects/');
+  });
+  for (const file of jsonlFiles) {
+    const p = file.webkitRelativePath || file.name;
+    const isSub = p.includes('/subagents/');
+    const times = await readFirstLast(file);
+    if (!times) continue;
+    const date = toLocalDate(new Date(times.first));
+    const dh = Math.max(0, Math.min((times.last - times.first) / 3600000, 24));
+    if (!byDate[date]) byDate[date] = { main: 0, sub: 0 };
+    if (isSub) byDate[date].sub += dh;
+    else byDate[date].main += dh;
+  }
+  return byDate;
+}
+
+// ── Stats computation ─────────────────────────────────────────────────────────
+function computeBaseline(byDate, td, lookbackDays = 14) {
+  let mainSum = 0, subSum = 0, activeDays = 0, ghostDays = 0;
+  for (let i = 1; i <= lookbackDays; i++) {
+    const d = addDays(td, -i);
+    const v = byDate[d];
+    if (!v) continue;
+    if (v.main > 0 || v.sub > 0) {
+      activeDays++;
+      mainSum += v.main;
+      subSum += v.sub;
+    }
+    if (v.main === 0 && v.sub > 0) ghostDays++;
+  }
+  return {
+    avgMainPerDay: mainSum / lookbackDays,
+    avgSubPerDay: subSum / lookbackDays,
+    activePct: activeDays / lookbackDays,
+    ghostPct: activeDays > 0 ? ghostDays / activeDays : 0,
+    lookbackDays,
+    activeDays,
+  };
+}
+
+function computeStreak(byDate, td) {
+  let streak = 0;
+  let d = (byDate[td]?.main || byDate[td]?.sub) ? td : addDays(td, -1);
+  while (byDate[d] && (byDate[d].main + byDate[d].sub) > 0) {
+    streak++;
+    d = addDays(d, -1);
+  }
+  return streak;
+}
+
+function monthToDate(byDate, td) {
+  const start = monthStart(td);
+  let mainH = 0, subH = 0, activeDays = 0, ghostDays = 0;
+  let d = start;
+  while (d <= td) {
+    const v = byDate[d];
+    if (v && (v.main + v.sub) > 0) {
+      activeDays++;
+      mainH += v.main;
+      subH += v.sub;
+      if (v.main === 0 && v.sub > 0) ghostDays++;
+    }
+    d = addDays(d, 1);
+  }
+  return { mainH, subH, activeDays, ghostDays };
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(byDate) {
+  const td = today();
+  const baseline = computeBaseline(byDate, td, 14);
+  const streak = computeStreak(byDate, td);
+  const mtd = monthToDate(byDate, td);
+
+  const dom = dayOfMonth(td);
+  const totalDays = daysInMonth(td);
+  const remainingDays = totalDays - dom;
+  const monthName = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  // Projections
+  const projMainRemaining = baseline.avgMainPerDay * remainingDays;
+  const projSubRemaining = baseline.avgSubPerDay * remainingDays;
+  const projMainTotal = mtd.mainH + projMainRemaining;
+  const projSubTotal = mtd.subH + projSubRemaining;
+  const projActiveDays = mtd.activeDays + Math.round(baseline.activePct * remainingDays);
+  const projGhostDays = mtd.ghostDays + Math.round(baseline.ghostPct * baseline.activePct * remainingDays);
+  const streakProjection = streak + Math.round(baseline.activePct * remainingDays);
+  const streakSurvives = baseline.activePct >= 0.85;
+  const autonomy = baseline.avgMainPerDay > 0
+    ? baseline.avgSubPerDay / baseline.avgMainPerDay
+    : (baseline.avgSubPerDay > 0 ? 99 : 0);
+
+  // Bar scale
+  const maxH = Math.max(projMainTotal, projSubTotal, 1);
+  const youActualPct = Math.round((mtd.mainH / maxH) * 100);
+  const youProjPct = Math.round((projMainTotal / maxH) * 100);
+  const aiActualPct = Math.round((mtd.subH / maxH) * 100);
+  const aiProjPct = Math.round((projSubTotal / maxH) * 100);
+
+  // Confidence bar (based on activePct)
+  const confCount = 10;
+  const filledConf = Math.round(baseline.activePct * confCount);
+  const confColor = baseline.activePct > 0.8 ? 'conf-filled' : baseline.activePct > 0.5 ? 'conf-med' : 'conf-low';
+  const confBlocks = Array(confCount).fill(0).map((_, i) =>
+    `<div class="conf-block ${i < filledConf ? confColor : ''}"></div>`
+  ).join('');
+
+  const streakColor = streak >= 30 ? '#e05d44' : streak >= 7 ? '#fe7d37' : '#56d364';
+
+  document.getElementById('card').innerHTML = `
+    <div class="month-header">📅 ${monthName} forecast · Day ${dom} of ${totalDays} · ${remainingDays} days remaining</div>
+
+    <div class="section">
+      <div class="section-title">Hours Forecast</div>
+
+      <div class="forecast-row">
+        <span class="row-label">You</span>
+        <div class="row-bar" style="background:#0d1117">
+          <div style="display:flex;height:100%">
+            <div class="bar-actual" style="width:${youActualPct}%;background:#238636"></div>
+            <div class="bar-projected" style="width:${Math.max(0,youProjPct-youActualPct)}%;background:#238636"></div>
+          </div>
+        </div>
+        <span class="row-value" style="color:#56d364">${mtd.mainH.toFixed(0)}h → <strong>${projMainTotal.toFixed(0)}h</strong></span>
+      </div>
+
+      <div class="forecast-row">
+        <span class="row-label">AI</span>
+        <div class="row-bar" style="background:#0d1117">
+          <div style="display:flex;height:100%">
+            <div class="bar-actual" style="width:${aiActualPct}%;background:#388bfd"></div>
+            <div class="bar-projected" style="width:${Math.max(0,aiProjPct-aiActualPct)}%;background:#388bfd"></div>
+          </div>
+        </div>
+        <span class="row-value" style="color:#79c0ff">${mtd.subH.toFixed(0)}h → <strong>${projSubTotal.toFixed(0)}h</strong></span>
+      </div>
+
+      <div style="font-size:0.75rem;color:#8b949e;margin-top:6px;font-style:italic;">
+        Solid = actual so far · Faded = projected remainder
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-now">Active days: <strong>${mtd.activeDays}</strong> / ${dom}</div>
+        <div class="stat-proj" style="color:#56d364">~${projActiveDays}</div>
+        <div class="stat-label">projected active days</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-now">Ghost Days so far: <strong>${mtd.ghostDays}</strong></div>
+        <div class="stat-proj" style="color:#ffd700">~${projGhostDays}</div>
+        <div class="stat-label">projected Ghost Days</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-now">Autonomy (14-day avg):</div>
+        <div class="stat-proj" style="color:#d2a8ff">${autonomy > 20 ? '∞' : autonomy.toFixed(1)}x</div>
+        <div class="stat-label">AI hours / your hours</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-now">Daily consistency:</div>
+        <div class="confidence-bar">${confBlocks}</div>
+        <div class="stat-label">${Math.round(baseline.activePct * 100)}% of last 14 days active</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section">
+      <div class="section-title">Streak Forecast</div>
+      <div class="streak-forecast">
+        <div class="streak-line">
+          <span class="streak-label">Current streak</span>
+          <span class="streak-val" style="color:${streakColor}">${streak} days</span>
+        </div>
+        <div class="streak-line">
+          <span class="streak-label">End-of-month projection</span>
+          <span class="streak-val">~${streakProjection} days</span>
+        </div>
+        <div class="streak-line">
+          <span class="streak-label">Streak survives month?</span>
+          <span class="streak-val" style="color:${streakSurvives ? '#56d364' : '#e3b341'}">${streakSurvives ? '✓ Likely' : '⚠ Uncertain'}</span>
+        </div>
+      </div>
+    </div>
+
+    <p class="note">Based on last 14 days · ${baseline.activeDays}/${baseline.lookbackDays} active days in baseline</p>
+  `;
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  document.getElementById('card').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">⏳</div>
+      <p>Reading ${files.length} files…</p>
+    </div>`;
+
+  try {
+    const byDate = await loadByDate(files);
+    render(byDate);
+  } catch (err) {
+    document.getElementById('card').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">⚠️</div>
+        <p>Error: ${err.message}</p>
+      </div>`;
+  }
+});
+</script>
+</body>
+</html>

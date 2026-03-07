@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claude Code Health Check — Is Your AI Agent Setup Production-Ready?</title>
+  <meta name="description" content="20-question diagnostic for your Claude Code setup. Score your safety, automation, monitoring, and recovery across 6 dimensions. Free, no signup." />
+  <meta property="og:title" content="Claude Code Health Check — Free Setup Diagnostic" />
+  <meta property="og:description" content="20 questions. 6 dimensions. Instant score. Find out if your Claude Code setup is production-ready." />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0f1419;
+      --bg-surface:  #1a2332;
+      --bg-card:     #1e2d3d;
+      --bg-hover:    #253545;
+      --accent:      #1da1f2;
+      --accent-dark: #0d8bd9;
+      --text:        #e7e9ea;
+      --text-muted:  #71767b;
+      --border:      rgba(255,255,255,.08);
+      --safe:        #00ba7c;
+      --caution:     #ffd166;
+      --warning-col: #ff6b35;
+      --critical:    #f4212e;
+      --radius:      12px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--bg-surface) 0%, #0d1b2a 100%);
+      border-bottom: 2px solid var(--accent);
+      padding: 48px 20px 36px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(29,161,242,.12) 0%, transparent 55%),
+        radial-gradient(ellipse at 80% 30%, rgba(0,186,124,.08) 0%, transparent 55%);
+      pointer-events: none;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(29,161,242,.15);
+      border: 1px solid rgba(29,161,242,.3);
+      color: var(--accent);
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 800;
+      line-height: 1.2;
+      position: relative;
+    }
+    h1 em { color: var(--accent); font-style: normal; }
+
+    .sub {
+      max-width: 560px;
+      margin: 12px auto 0;
+      font-size: .95rem;
+      color: var(--text-muted);
+      position: relative;
+    }
+
+    .pills {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+      position: relative;
+    }
+    .pill {
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--border);
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: .75rem;
+      color: var(--text-muted);
+    }
+    .pill strong { color: var(--accent); }
+
+    main {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 24px 16px 80px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .card-label {
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 16px;
+    }
+
+    .category-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .category-desc {
+      font-size: .82rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .question {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background .15s;
+      margin-bottom: 4px;
+    }
+    .question:hover { background: var(--bg-hover); }
+
+    .q-check {
+      width: 22px;
+      height: 22px;
+      border: 2px solid var(--text-muted);
+      border-radius: 6px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s;
+      font-size: .8rem;
+    }
+    .question.checked .q-check {
+      background: var(--safe);
+      border-color: var(--safe);
+      color: #fff;
+    }
+
+    .q-text {
+      font-size: .88rem;
+      flex: 1;
+    }
+    .q-weight {
+      font-size: .65rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .progress-wrap {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--bg);
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255,255,255,.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--safe));
+      border-radius: 3px;
+      transition: width .3s ease;
+      width: 0%;
+    }
+    .progress-text {
+      font-size: .72rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    #results { display: none; }
+
+    .score-circle {
+      width: 160px;
+      height: 160px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      position: relative;
+    }
+    .score-number {
+      font-size: 3rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .score-label {
+      font-size: .8rem;
+      color: var(--text-muted);
+    }
+
+    .dim-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 500px) {
+      .dim-grid { grid-template-columns: 1fr; }
+    }
+
+    .dim-card {
+      background: rgba(255,255,255,.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .dim-name {
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 6px;
+    }
+    .dim-bar-bg {
+      height: 8px;
+      background: rgba(255,255,255,.06);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 4px;
+    }
+    .dim-bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width .5s ease;
+    }
+    .dim-score {
+      font-size: .7rem;
+      color: var(--text-muted);
+    }
+
+    .rec-list { list-style: none; }
+    .rec-item {
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border-left: 3px solid;
+    }
+    .rec-item.high {
+      background: rgba(244,33,46,.08);
+      border-color: var(--critical);
+    }
+    .rec-item.med {
+      background: rgba(255,107,53,.08);
+      border-color: var(--warning-col);
+    }
+    .rec-item.low {
+      background: rgba(255,209,102,.06);
+      border-color: var(--caution);
+    }
+    .rec-title {
+      font-weight: 700;
+      font-size: .88rem;
+      margin-bottom: 4px;
+    }
+    .rec-desc {
+      font-size: .8rem;
+      color: var(--text-muted);
+    }
+    .rec-tag {
+      display: inline-block;
+      font-size: .65rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-top: 6px;
+      font-weight: 600;
+    }
+    .rec-tag.diy { background: rgba(0,186,124,.15); color: var(--safe); }
+    .rec-tag.kit { background: rgba(29,161,242,.15); color: var(--accent); }
+    .rec-hook-link { display: inline-block; font-size: .75rem; color: var(--text-muted); margin-top: 6px; text-decoration: none; transition: color .15s; }
+    .rec-hook-link:hover { color: var(--accent); }
+
+    .cta-card {
+      background: linear-gradient(135deg, rgba(29,161,242,.08), rgba(0,186,124,.06));
+      border: 1px solid rgba(29,161,242,.2);
+      border-radius: var(--radius);
+      padding: 28px;
+      text-align: center;
+      margin-top: 24px;
+    }
+    .cta-card h3 {
+      font-size: 1.2rem;
+      margin-bottom: 8px;
+    }
+    .cta-card p {
+      font-size: .85rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .btn-cta {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      color: #fff;
+      text-decoration: none;
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 12px 32px;
+      border-radius: 10px;
+      box-shadow: 0 4px 18px rgba(29,161,242,.35);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .btn-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(29,161,242,.5);
+    }
+    .btn-sub {
+      display: block;
+      font-size: .7rem;
+      font-weight: 400;
+      opacity: .8;
+      margin-top: 3px;
+    }
+
+    .btn-scan {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 20px;
+      box-shadow: 0 4px 18px rgba(29,161,242,.3);
+      transition: transform .15s;
+    }
+    .btn-scan:hover { transform: translateY(-2px); }
+    .btn-scan:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-reset {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: .85rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+    .btn-reset:hover { color: var(--text); border-color: var(--text-muted); }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: .72rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp .4s ease both; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Free &middot; No Signup &middot; 100% Client-Side</div>
+  <h1><em>Claude Code</em> Health Check</h1>
+  <p class="sub">20 questions across 6 dimensions. Find out if your AI agent setup is production-ready.</p>
+  <div class="pills">
+    <span class="pill"><strong>6</strong> dimensions</span>
+    <span class="pill"><strong>20</strong> checks</span>
+    <span class="pill"><strong>0</strong> data sent</span>
+  </div>
+</header>
+
+<main>
+  <div class="progress-wrap">
+    <div class="progress-bar-bg">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-text" id="progressText">0 / 20 answered</div>
+  </div>
+
+  <div id="checklist"></div>
+
+  <button class="btn-scan" id="btnScan" onclick="showResults()" disabled>
+    Get Your Score &rarr;
+  </button>
+
+  <div id="results">
+    <div class="card fade-up">
+      <div class="card-label">Your Score</div>
+      <div class="score-circle" id="scoreCircle">
+        <div class="score-number" id="scoreNum">0</div>
+        <div class="score-label">/ 100</div>
+      </div>
+      <div style="text-align:center; margin-bottom:8px;">
+        <span id="scoreGrade" style="font-size:1.2rem; font-weight:700;"></span>
+      </div>
+    </div>
+
+    <div class="card fade-up">
+      <div class="card-label">Dimension Breakdown</div>
+      <div class="dim-grid" id="dimGrid"></div>
+    </div>
+
+    <div class="card fade-up">
+      <div class="card-label">Recommendations</div>
+      <ul class="rec-list" id="recList"></ul>
+    </div>
+
+    <div class="card fade-up" id="shareCard" style="text-align:center;">
+      <div class="card-label">Share Your Score</div>
+      <canvas id="shareCanvas" width="600" height="315" style="display:none;"></canvas>
+      <div id="sharePreview" style="margin-bottom:16px;"></div>
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+        <button class="share-btn" id="btnTwitter" style="background:#1da1f2; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem;">Share on X / Twitter</button>
+        <button class="share-btn" id="btnCopy" style="background:var(--bg-hover); color:var(--text); border:1px solid var(--border); padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem;">Copy Text</button>
+        <button class="share-btn" id="btnDownload" style="background:var(--bg-hover); color:var(--text); border:1px solid var(--border); padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem;">Download Card</button>
+      </div>
+    </div>
+
+    <div class="cta-card fade-up" id="ctaCard">
+      <h3>Production hooks + templates for autonomous Claude Code</h3>
+      <p>10 hooks + 5 templates covering 18/20 checks. From 108 hours of real autonomous operation.</p>
+      <a href="https://yurukusa.gumroad.com/l/cc-codex-ops-kit?utm_source=health-check&utm_medium=tool&utm_campaign=cta" class="btn-cta" target="_blank" rel="noopener">
+        Get CC-Codex Ops Kit
+        <span class="btn-sub">$29 on Gumroad &middot; instant download</span>
+      </a>
+    </div>
+
+    <button class="btn-reset" onclick="resetCheck()">Start Over</button>
+  </div>
+</main>
+
+<footer>
+  Built by <a href="https://github.com/yurukusa" target="_blank">yurukusa</a> &middot;
+  Also try: <a href="https://yurukusa.github.io/cc-cost-check/" target="_blank">cc-cost-check</a> &middot;
+  <a href="https://yurukusa.github.io/cc-wrapped/" target="_blank">cc-wrapped</a> &middot;
+  <a href="https://yurukusa.github.io/cc-roast/" target="_blank">cc-roast</a> &middot;
+  <a href="https://yurukusa.github.io/risk-score-web/" target="_blank">CLAUDE.md Risk Scanner</a>
+</footer>
+
+<script>
+const QUESTIONS = [
+  // Safety (4 questions, 5 pts each = 20)
+  {
+    cat: "safety", catName: "Safety Guards",
+    catDesc: "Preventing destructive operations",
+    q: "Do you have a PreToolUse hook that blocks dangerous commands (rm -rf, git reset --hard)?",
+    w: 5,
+    rec: { pri: "high", title: "Add a PreToolUse safety hook", desc: "Block destructive bash commands before they execute. A single hook script can catch rm -rf, force push, and database drops.", diy: "Write a shell script that checks tool_input.command against a blocklist", kit: "Included: pre-tool-guard.sh with 15+ patterns", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/branch-guard.sh" }
+  },
+  {
+    cat: "safety",
+    q: "Are API keys and secrets stored in dedicated files (not hardcoded in CLAUDE.md)?",
+    w: 5,
+    rec: { pri: "high", title: "Move secrets out of CLAUDE.md", desc: "Hardcoded tokens in instruction files can be exposed through context sharing or screen recordings.", diy: "Move to ~/.credentials or environment variables", kit: "Included: credential management template", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/CLAUDE-autonomous.md" }
+  },
+  {
+    cat: "safety",
+    q: "Does your setup prevent the AI from pushing to main/master without review?",
+    w: 5,
+    rec: { pri: "med", title: "Guard git push to protected branches", desc: "Autonomous agents should push to feature branches, not directly to main.", diy: "Add branch check to PreToolUse hook", kit: "Included in pre-tool-guard.sh", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/branch-guard.sh" }
+  },
+  {
+    cat: "safety",
+    q: "Do you have a mechanism to block external API calls (curl POST/PUT) when errors exist?",
+    w: 5,
+    rec: { pri: "med", title: "Add an error-aware gate", desc: "Prevent the AI from publishing or pushing when unresolved errors exist.", diy: "Implement err-tracker check in PreToolUse", kit: "Included: err-tracker-gate.sh", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/error-gate.sh" }
+  },
+
+  // Quality (4 questions, 5 pts each = 20)
+  {
+    cat: "quality", catName: "Code Quality",
+    catDesc: "Catching errors before they compound",
+    q: "Do you run syntax checks after every file edit (PostToolUse hook)?",
+    w: 5,
+    rec: { pri: "high", title: "Add post-edit syntax checking", desc: "A PostToolUse hook on Edit/Write can run language-specific syntax checks immediately.", diy: "python -m py_compile for Python, eslint for JS, etc.", kit: "Included: syntax-check.sh with multi-language support", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/syntax-check.sh" }
+  },
+  {
+    cat: "quality",
+    q: "Do you automatically detect and track error codes from bash output?",
+    w: 5,
+    rec: { pri: "med", title: "Implement error detection", desc: "Scan bash output for error patterns and track them. Same error twice = escalate priority.", diy: "Grep bash output for ERR_CODE patterns in PostToolUse", kit: "Included: err-code-detector.sh + err-tracker CLI", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/activity-logger.sh" }
+  },
+  {
+    cat: "quality",
+    q: "Do you have a Definition of Done (DoD) checklist for task completion?",
+    w: 5,
+    rec: { pri: "low", title: "Create completion criteria", desc: "Define what 'done' means: tests pass, no open errors, syntax clean, docs updated.", diy: "Write a DoD checklist in CLAUDE.md", kit: "Included: dod-checklists.md template", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/dod-checklists.md" }
+  },
+  {
+    cat: "quality",
+    q: "Does your AI verify its own output (e.g., screenshots, GET requests after publishing)?",
+    w: 5,
+    rec: { pri: "med", title: "Add output verification", desc: "Trust but verify. After publishing or deploying, confirm the result matches expectations.", diy: "Add verification steps to your workflow instructions", kit: "Included in mission.md template", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/CLAUDE-autonomous.md" }
+  },
+
+  // Monitoring (3 questions)
+  {
+    cat: "monitoring", catName: "Monitoring",
+    catDesc: "Knowing what your AI is doing",
+    q: "Do you monitor context window usage and get alerts before it fills up?",
+    w: 5,
+    rec: { pri: "high", title: "Add context window monitoring", desc: "AI agents lose memory when context fills. Monitor usage and compact before critical.", diy: "Check context percentage in PostToolUse hook", kit: "Included: context-monitor.sh with 4-tier alerts", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/context-monitor.sh" }
+  },
+  {
+    cat: "monitoring",
+    q: "Do you have activity logging (what commands ran, when, what changed)?",
+    w: 5,
+    rec: { pri: "med", title: "Implement activity logging", desc: "A PostToolUse hook can log every tool use to a JSONL file for later analysis.", diy: "Log tool_name + timestamp + summary to a file", kit: "Included: activity-logger.sh", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/activity-logger.sh" }
+  },
+  {
+    cat: "monitoring",
+    q: "Do you generate daily summaries of AI work (proof-log, session reports)?",
+    w: 5,
+    rec: { pri: "low", title: "Add daily summarization", desc: "Auto-generate a 5W1H summary at session end. Makes handoffs and audits trivial.", diy: "Write a Stop hook that summarizes activity logs", kit: "Included: proof-log-session.sh", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/proof-log-session.sh" }
+  },
+
+  // Recovery (3 questions)
+  {
+    cat: "recovery", catName: "Recovery",
+    catDesc: "Bouncing back from failures",
+    q: "Do you create git backup branches before major changes?",
+    w: 5,
+    rec: { pri: "high", title: "Add pre-change backups", desc: "git checkout -b backup/before-changes before risky operations. Cheap insurance.", diy: "Add to CLAUDE.md instructions", kit: "Included in CLAUDE.md template", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/CLAUDE-autonomous.md" }
+  },
+  {
+    cat: "recovery",
+    q: "Does your AI have a watchdog that detects and recovers from hangs?",
+    w: 5,
+    rec: { pri: "med", title: "Implement a watchdog", desc: "Detect idle/frozen states and automatically restart or nudge the agent.", diy: "Write a tmux-based idle detector", kit: "Included: cc-solo-watchdog with auto-restart", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/session-start-marker.sh" }
+  },
+  {
+    cat: "recovery",
+    q: "Do you have a fallback plan when the AI gets stuck in a loop?",
+    w: 5,
+    rec: { pri: "med", title: "Add loop detection", desc: "Track repeated command patterns. If the same error appears 3+ times, break and escalate.", diy: "Log command signatures and count repeats", kit: "Included: root-cause-prompt.sh", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/LESSONS.md" }
+  },
+
+  // Autonomy (3 questions)
+  {
+    cat: "autonomy", catName: "Autonomy",
+    catDesc: "Running without human intervention",
+    q: "Can your AI run tasks from a queue without human prompting?",
+    w: 5,
+    rec: { pri: "med", title: "Implement a task queue", desc: "YAML-based task queue that the AI reads, executes, and marks complete.", diy: "Create a task-queue.yaml with status tracking", kit: "Included: task-queue.yaml + task-queue CLI", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/task-queue.yaml" }
+  },
+  {
+    cat: "autonomy",
+    q: "Does your setup block the AI from asking unnecessary questions?",
+    w: 5,
+    rec: { pri: "low", title: "Reduce human dependency", desc: "A hook that detects 'What would you like?' patterns and redirects to autonomous decision-making.", diy: "Add 'don't ask, decide' rules to CLAUDE.md", kit: "Included: no-ask-human.sh hook", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/no-ask-human.sh" }
+  },
+  {
+    cat: "autonomy",
+    q: "Can your AI continue working across session restarts (persistent state)?",
+    w: 5,
+    rec: { pri: "med", title: "Add state persistence", desc: "Use mission.md or MEMORY.md to maintain state across context compactions and restarts.", diy: "Write current state to a file on session end", kit: "Included: mission.md + MEMORY.md templates", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/mission.md" }
+  },
+
+  // Coordination (3 questions)
+  {
+    cat: "coordination", catName: "Coordination",
+    catDesc: "Working with multiple agents or tools",
+    q: "Do you have a decision audit trail (why was each decision made)?",
+    w: 5,
+    rec: { pri: "low", title: "Log decisions with rationale", desc: "Track what was decided, why, and what alternatives were rejected.", diy: "Add decision logging to PostToolUse", kit: "Included: decision-log support in activity-logger", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/hooks/decision-warn.sh" }
+  },
+  {
+    cat: "coordination",
+    q: "Can your AI coordinate with other AI instances or tools?",
+    w: 3,
+    rec: { pri: "low", title: "Enable multi-agent communication", desc: "File-based or tmux-based messaging between AI instances.", diy: "Use shared files or tmux send-keys", kit: "Included: agent-relay.sh + tachikoma messaging", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/CLAUDE-autonomous.md" }
+  },
+  {
+    cat: "coordination",
+    q: "Do you have a structured way to capture and reuse lessons learned?",
+    w: 2,
+    rec: { pri: "low", title: "Implement lesson capture", desc: "Automatically log errors and their fixes for future reference.", diy: "Maintain a LESSONS.md file", kit: "Included: shared-brain knowledge base system", hookUrl: "https://github.com/yurukusa/claude-code-hooks/blob/main/templates/LESSONS.md" }
+  }
+];
+
+// State
+const answered = new Set();
+const checked = new Set();
+
+function init() {
+  const container = document.getElementById('checklist');
+  let currentCat = '';
+  let catIdx = 0;
+
+  QUESTIONS.forEach((q, i) => {
+    if (q.cat !== currentCat) {
+      currentCat = q.cat;
+      catIdx++;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-label">Dimension ${catIdx}: ${q.catName}</div>
+        <div class="category-desc">${q.catDesc}</div>
+        <div id="cat-${q.cat}"></div>
+      `;
+      container.appendChild(card);
+    }
+
+    const catDiv = document.getElementById(`cat-${q.cat}`);
+    const qDiv = document.createElement('div');
+    qDiv.className = 'question';
+    qDiv.id = `q-${i}`;
+    qDiv.onclick = () => toggleQ(i);
+    qDiv.innerHTML = `
+      <div class="q-check" id="chk-${i}"></div>
+      <div class="q-text">${q.q}</div>
+      <div class="q-weight">${q.w}pt</div>
+    `;
+    catDiv.appendChild(qDiv);
+  });
+}
+
+function toggleQ(i) {
+  const el = document.getElementById(`q-${i}`);
+  const chk = document.getElementById(`chk-${i}`);
+
+  if (checked.has(i)) {
+    checked.delete(i);
+    el.classList.remove('checked');
+    chk.textContent = '';
+  } else {
+    checked.add(i);
+    el.classList.add('checked');
+    chk.textContent = '\u2713';
+  }
+
+  answered.add(i);
+  updateProgress();
+}
+
+function updateProgress() {
+  const pct = (answered.size / QUESTIONS.length) * 100;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${answered.size} / ${QUESTIONS.length} answered`;
+  document.getElementById('btnScan').disabled = answered.size < QUESTIONS.length;
+}
+
+function showResults() {
+  // Calculate scores
+  const total = QUESTIONS.reduce((s, q) => s + q.w, 0);
+  let score = 0;
+  const dimScores = {};
+  const dimTotals = {};
+
+  QUESTIONS.forEach((q, i) => {
+    if (!dimScores[q.cat]) { dimScores[q.cat] = 0; dimTotals[q.cat] = 0; }
+    dimTotals[q.cat] += q.w;
+    if (checked.has(i)) {
+      score += q.w;
+      dimScores[q.cat] += q.w;
+    }
+  });
+
+  const pct = Math.round((score / total) * 100);
+
+  // Overall score
+  document.getElementById('scoreNum').textContent = pct;
+  const circle = document.getElementById('scoreCircle');
+  const grade = document.getElementById('scoreGrade');
+
+  if (pct >= 80) {
+    circle.style.background = `radial-gradient(circle, rgba(0,186,124,.15), rgba(0,186,124,.05))`;
+    circle.style.border = `3px solid var(--safe)`;
+    grade.textContent = 'Production Ready';
+    grade.style.color = 'var(--safe)';
+  } else if (pct >= 60) {
+    circle.style.background = `radial-gradient(circle, rgba(255,209,102,.12), rgba(255,209,102,.04))`;
+    circle.style.border = `3px solid var(--caution)`;
+    grade.textContent = 'Getting There';
+    grade.style.color = 'var(--caution)';
+  } else if (pct >= 35) {
+    circle.style.background = `radial-gradient(circle, rgba(255,107,53,.12), rgba(255,107,53,.04))`;
+    circle.style.border = `3px solid var(--warning-col)`;
+    grade.textContent = 'Needs Work';
+    grade.style.color = 'var(--warning-col)';
+  } else {
+    circle.style.background = `radial-gradient(circle, rgba(244,33,46,.12), rgba(244,33,46,.04))`;
+    circle.style.border = `3px solid var(--critical)`;
+    grade.textContent = 'Critical';
+    grade.style.color = 'var(--critical)';
+  }
+
+  // Dimension breakdown
+  const grid = document.getElementById('dimGrid');
+  grid.innerHTML = '';
+  const catNames = {};
+  QUESTIONS.forEach(q => { catNames[q.cat] = q.catName; });
+
+  for (const cat of Object.keys(dimTotals)) {
+    const dimPct = Math.round((dimScores[cat] / dimTotals[cat]) * 100);
+    let color = 'var(--safe)';
+    if (dimPct < 34) color = 'var(--critical)';
+    else if (dimPct < 60) color = 'var(--warning-col)';
+    else if (dimPct < 80) color = 'var(--caution)';
+
+    const card = document.createElement('div');
+    card.className = 'dim-card';
+    card.innerHTML = `
+      <div class="dim-name">${catNames[cat]}</div>
+      <div class="dim-bar-bg">
+        <div class="dim-bar-fill" style="width:${dimPct}%; background:${color};"></div>
+      </div>
+      <div class="dim-score">${dimScores[cat]} / ${dimTotals[cat]} pts (${dimPct}%)</div>
+    `;
+    grid.appendChild(card);
+  }
+
+  // Recommendations (only for unchecked items)
+  const recList = document.getElementById('recList');
+  recList.innerHTML = '';
+  const recs = [];
+
+  QUESTIONS.forEach((q, i) => {
+    if (!checked.has(i) && q.rec) {
+      recs.push({ ...q.rec, weight: q.w });
+    }
+  });
+
+  // Sort by priority
+  const priOrder = { high: 0, med: 1, low: 2 };
+  recs.sort((a, b) => priOrder[a.pri] - priOrder[b.pri] || b.weight - a.weight);
+
+  recs.forEach(r => {
+    const li = document.createElement('li');
+    li.className = `rec-item ${r.pri}`;
+    const hookLink = r.hookUrl
+      ? `<a class="rec-hook-link" href="${r.hookUrl}" target="_blank" rel="noopener">↳ claude-code-hooks: ${r.hookUrl.split('/').pop()}</a>`
+      : '';
+    li.innerHTML = `
+      <div class="rec-title">${r.title}</div>
+      <div class="rec-desc">${r.desc}</div>
+      <span class="rec-tag diy">DIY: ${r.diy}</span>
+      ${hookLink}
+    `;
+    recList.appendChild(li);
+  });
+
+  if (recs.length === 0) {
+    recList.innerHTML = '<li style="padding:12px; color:var(--safe); font-weight:700;">All clear! Your setup covers all 20 checks.</li>';
+    document.getElementById('ctaCard').style.display = 'none';
+  }
+
+  // Generate share card
+  generateShareCard(pct, grade.textContent, dimScores, dimTotals, catNames);
+
+  // Show results
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('btnScan').style.display = 'none';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+}
+
+function generateShareCard(pct, gradeText, dimScores, dimTotals, catNames) {
+  const canvas = document.getElementById('shareCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#0f1419';
+  ctx.fillRect(0, 0, 600, 315);
+
+  // Accent line
+  let accentColor = '#00ba7c';
+  if (pct < 35) accentColor = '#f4212e';
+  else if (pct < 60) accentColor = '#ff6b35';
+  else if (pct < 80) accentColor = '#ffd166';
+  ctx.fillStyle = accentColor;
+  ctx.fillRect(0, 0, 600, 4);
+
+  // Title
+  ctx.fillStyle = '#71767b';
+  ctx.font = '14px -apple-system, sans-serif';
+  ctx.fillText('Claude Code Health Check', 32, 40);
+
+  // Score
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 64px -apple-system, sans-serif';
+  ctx.fillText(`${pct}`, 32, 110);
+
+  const scoreWidth = ctx.measureText(`${pct}`).width;
+  ctx.fillStyle = '#71767b';
+  ctx.font = '24px -apple-system, sans-serif';
+  ctx.fillText('/ 100', 32 + scoreWidth + 8, 110);
+
+  // Grade
+  ctx.fillStyle = accentColor;
+  ctx.font = 'bold 20px -apple-system, sans-serif';
+  ctx.fillText(gradeText, 32, 142);
+
+  // Dimension bars
+  const cats = Object.keys(dimTotals);
+  const barStartY = 170;
+  const barHeight = 12;
+  const barMaxWidth = 180;
+  const gap = 22;
+
+  cats.forEach((cat, i) => {
+    const dimPct = Math.round((dimScores[cat] / dimTotals[cat]) * 100);
+    const y = barStartY + i * gap;
+
+    // Label
+    ctx.fillStyle = '#e7e9ea';
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillText(catNames[cat], 32, y);
+
+    // Bar background
+    ctx.fillStyle = '#1a2332';
+    ctx.fillRect(160, y - 10, barMaxWidth, barHeight);
+
+    // Bar fill
+    let barColor = '#00ba7c';
+    if (dimPct < 34) barColor = '#f4212e';
+    else if (dimPct < 60) barColor = '#ff6b35';
+    else if (dimPct < 80) barColor = '#ffd166';
+    ctx.fillStyle = barColor;
+    ctx.fillRect(160, y - 10, (dimPct / 100) * barMaxWidth, barHeight);
+
+    // Percentage
+    ctx.fillStyle = '#71767b';
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillText(`${dimPct}%`, 350, y);
+  });
+
+  // URL
+  ctx.fillStyle = '#1da1f2';
+  ctx.font = '13px -apple-system, sans-serif';
+  ctx.fillText('yurukusa.github.io/cc-health-check', 32, 300);
+
+  // Show preview
+  const preview = document.getElementById('sharePreview');
+  const img = canvas.toDataURL('image/png');
+  preview.innerHTML = `<img src="${img}" style="max-width:100%; border-radius:8px; border:1px solid var(--border);" alt="Health Check Score Card" />`;
+
+  // Share text
+  const dims = cats.map(cat => {
+    const dimPct = Math.round((dimScores[cat] / dimTotals[cat]) * 100);
+    return `${catNames[cat]}: ${dimPct}%`;
+  }).join(' | ');
+  const shareText = `My Claude Code Health Score: ${pct}/100 — ${gradeText}\n\n${dims}\n\nhttps://yurukusa.github.io/cc-health-check/ #ClaudeCode`;
+
+  // Twitter button
+  document.getElementById('btnTwitter').onclick = () => {
+    const url = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+    window.open(url, '_blank', 'width=600,height=400');
+  };
+
+  // Copy button
+  document.getElementById('btnCopy').onclick = () => {
+    navigator.clipboard.writeText(shareText).then(() => {
+      document.getElementById('btnCopy').textContent = 'Copied!';
+      setTimeout(() => { document.getElementById('btnCopy').textContent = 'Copy Text'; }, 2000);
+    });
+  };
+
+  // Download button
+  document.getElementById('btnDownload').onclick = () => {
+    const a = document.createElement('a');
+    a.href = img;
+    a.download = `claude-code-health-${pct}.png`;
+    a.click();
+  };
+}
+
+function resetCheck() {
+  answered.clear();
+  checked.clear();
+  QUESTIONS.forEach((_, i) => {
+    const el = document.getElementById(`q-${i}`);
+    const chk = document.getElementById(`chk-${i}`);
+    el.classList.remove('checked');
+    chk.textContent = '';
+  });
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('btnScan').style.display = 'block';
+  document.getElementById('btnScan').disabled = true;
+  updateProgress();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+init();
+</script>
+
+</body>
+</html>

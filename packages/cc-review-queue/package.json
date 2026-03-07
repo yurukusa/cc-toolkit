@@ -1,0 +1,36 @@
+{
+  "name": "cc-review-queue",
+  "version": "1.0.0",
+  "description": "Show files changed by AI that need human review — reads activity-log.jsonl from Claude Code",
+  "type": "module",
+  "bin": {
+    "cc-review-queue": "cli.mjs"
+  },
+  "scripts": {
+    "prepublishOnly": "node --check cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude-code",
+    "ai",
+    "review",
+    "audit",
+    "activity-log",
+    "cli",
+    "productivity"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-review-queue"
+  },
+  "homepage": "https://github.com/yurukusa/cc-review-queue"
+}

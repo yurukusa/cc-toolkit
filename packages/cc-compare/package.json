@@ -1,0 +1,35 @@
+{
+  "name": "cc-compare",
+  "version": "1.0.1",
+  "description": "Compare two time periods of Claude Code activity — week over week, month over month",
+  "type": "module",
+  "bin": {
+    "cc-compare": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "productivity",
+    "cli",
+    "cc-toolkit"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yurukusa/cc-compare.git"
+  },
+  "homepage": "https://yurukusa.github.io/cc-toolkit/",
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "cc-agent-load": ">=1.0.0"
+  }
+}

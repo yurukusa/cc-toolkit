@@ -1,0 +1,26 @@
+{
+  "name": "cc-error",
+  "version": "1.0.0",
+  "description": "Which Claude Code tools fail most often? 54% of sessions hit at least one error. WebFetch fails 25% of the time. Track tool failure rates across all your sessions.",
+  "type": "module",
+  "bin": {
+    "cc-error": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude", "claude-code", "anthropic", "cli", "productivity",
+    "ai", "developer-tools", "session-analysis", "errors", "debugging"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-error"
+  },
+  "homepage": "https://yurukusa.github.io/cc-error/"
+}

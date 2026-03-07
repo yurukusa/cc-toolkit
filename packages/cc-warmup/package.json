@@ -1,0 +1,25 @@
+{
+  "name": "cc-warmup",
+  "version": "1.0.0",
+  "description": "Does Claude Code warm up or fade? Tool execution rate progression within sessions — early, mid, and late phase analysis.",
+  "type": "module",
+  "bin": {
+    "cc-warmup": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "developer-tools",
+    "analytics",
+    "performance"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

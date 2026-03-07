@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cc-stats-badge — Claude Code Badge Generator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 16px; }
+
+  h1 { font-family: monospace; font-size: 1.3rem; color: #58a6ff; margin-bottom: 4px; }
+  .subtitle { color: #8b949e; font-size: 0.85rem; margin-bottom: 32px; }
+
+  .picker-btn { background: #21262d; border: 1px solid #30363d; color: #e6edf3; padding: 10px 20px; border-radius: 8px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: background 0.15s; margin-bottom: 24px; }
+  .picker-btn:hover { background: #30363d; }
+  #fileInput { display: none; }
+
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px; width: 100%; max-width: 580px; }
+
+  .badge-preview { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+
+  .stats-row { display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat-chip { background: #21262d; border-radius: 8px; padding: 10px 16px; flex: 1; min-width: 120px; text-align: center; }
+  .stat-value { font-size: 1.4rem; font-weight: 700; font-family: monospace; }
+  .stat-label { font-size: 0.72rem; color: #8b949e; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .section-label { font-size: 0.72rem; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .code-block { background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 12px 14px; font-family: monospace; font-size: 0.8rem; color: #e6edf3; overflow-x: auto; white-space: nowrap; margin-bottom: 8px; position: relative; }
+  .copy-row { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+  .copy-btn { background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 4px 10px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; }
+  .copy-btn:hover { background: #30363d; color: #e6edf3; }
+
+  .download-btn { background: #238636; border: none; color: #fff; padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; width: 100%; margin-top: 8px; }
+  .download-btn:hover { background: #2ea043; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: #8b949e; }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.88rem; line-height: 1.6; }
+
+  .hint { font-size: 0.78rem; color: #8b949e; text-align: center; margin-top: 16px; }
+  .hint a { color: #58a6ff; text-decoration: none; }
+
+  .divider { border-top: 1px solid #21262d; margin: 16px 0; }
+</style>
+</head>
+<body>
+
+<h1>cc-stats-badge</h1>
+<p class="subtitle">Generate a Claude Code stats badge for your GitHub README.</p>
+
+<label class="picker-btn" for="fileInput">
+  📁 Select ~/.claude Folder
+</label>
+<input type="file" id="fileInput" webkitdirectory multiple>
+
+<div class="card" id="card">
+  <div class="empty-state">
+    <div class="icon">🏅</div>
+    <p>Select your <strong>~/.claude</strong> folder to generate your stats badge.</p>
+    <br>
+    <p style="color:#8b949e;font-size:0.8rem;">Shows your streak, monthly hours, and AI autonomy ratio.<br>Perfect for GitHub README profiles.</p>
+  </div>
+</div>
+
+<p class="hint" style="margin-top:16px;">Also available as CLI: <a href="https://github.com/yurukusa/cc-stats-badge" target="_blank">npx @yurukusa/cc-stats-badge</a> · Part of <a href="https://yurukusa.github.io/cc-toolkit/" target="_blank">cc-toolkit</a></p>
+
+<script>
+// ── Date helpers ──────────────────────────────────────────────────────────────
+function toLocalDate(d) { return d.toLocaleDateString('sv-SE'); }
+function today() { return toLocalDate(new Date()); }
+function addDays(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return toLocalDate(d);
+}
+function monthStart() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+}
+function monthName() {
+  return new Date().toLocaleString('en-US', { month: 'short' });
+}
+
+// ── Project name helper ───────────────────────────────────────────────────────
+function cleanProjectName(dirName) {
+  if (!dirName) return '?';
+  if (dirName.startsWith('-tmp')) return '/tmp';
+  const parts = dirName.split('-').filter(Boolean);
+  if (parts[0] === 'home' && parts.length >= 2) {
+    const rest = parts.slice(2);
+    if (rest.length === 0) return '~';
+    if (rest[0] === 'projects') rest.shift();
+    return rest.join('-') || '~';
+  }
+  return dirName;
+}
+
+// ── JSONL reading ─────────────────────────────────────────────────────────────
+async function readFirstLast(file) {
+  const CHUNK = 4096;
+  const size = file.size;
+  if (size === 0) return null;
+  try {
+    const headText = new TextDecoder().decode(await file.slice(0, Math.min(CHUNK, size)).arrayBuffer());
+    const firstLine = headText.split('\n').find(l => l.trim());
+    if (!firstLine) return null;
+    const tailText = new TextDecoder().decode(await file.slice(Math.max(0, size - CHUNK)).arrayBuffer());
+    const lastLine = tailText.split('\n').filter(l => l.trim()).pop() || firstLine;
+    const parseTs = l => { try { return new Date(JSON.parse(l).timestamp || '').getTime() || null; } catch { return null; } };
+    const first = parseTs(firstLine), last = parseTs(lastLine);
+    return (first && last) ? { first, last } : null;
+  } catch { return null; }
+}
+
+async function loadByDate(files) {
+  const byDate = {};
+  const jsonlFiles = Array.from(files).filter(f => {
+    const p = f.webkitRelativePath || f.name;
+    return p.endsWith('.jsonl') && p.includes('/projects/');
+  });
+  for (const file of jsonlFiles) {
+    const p = file.webkitRelativePath || file.name;
+    const isSub = p.includes('/subagents/');
+    const times = await readFirstLast(file);
+    if (!times) continue;
+    const date = toLocalDate(new Date(times.first));
+    const dh = Math.max(0, Math.min((times.last - times.first) / 3600000, 24));
+    if (!byDate[date]) byDate[date] = { main: 0, sub: 0 };
+    if (isSub) byDate[date].sub += dh;
+    else byDate[date].main += dh;
+  }
+  return byDate;
+}
+
+// ── Stats computation ─────────────────────────────────────────────────────────
+function computeStats(byDate) {
+  const td = today();
+  const yd = addDays(td, -1);
+  const ms = monthStart();
+
+  // Streak
+  let streak = 0;
+  let d = (byDate[td]?.main || byDate[td]?.sub) ? td : yd;
+  while ((byDate[d]?.main || 0) + (byDate[d]?.sub || 0) > 0) {
+    streak++;
+    d = addDays(d, -1);
+  }
+
+  // Monthly hours (You = main)
+  let monthMain = 0, monthSub = 0;
+  for (const [date, v] of Object.entries(byDate)) {
+    if (date >= ms) { monthMain += v.main; monthSub += v.sub; }
+  }
+  const totalMonthly = monthMain + monthSub;
+
+  // Autonomy ratio (last 30 days)
+  const cut30 = addDays(td, -30);
+  let main30 = 0, sub30 = 0;
+  for (const [date, v] of Object.entries(byDate)) {
+    if (date >= cut30) { main30 += v.main; sub30 += v.sub; }
+  }
+  const autonomy = main30 > 0 ? sub30 / main30 : (sub30 > 0 ? 99 : 0);
+
+  return { streak, monthMain, totalMonthly, autonomy, monthShort: monthName() };
+}
+
+// ── SVG badge ─────────────────────────────────────────────────────────────────
+// Approximate character widths at font-size 11
+function textWidth(str, fontSize) {
+  const charWidth = fontSize * 0.6;
+  return str.length * charWidth;
+}
+
+function escapeXml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function generateBadgeSVG({ streak, totalMonthly, autonomy, monthShort }) {
+  const label = 'Claude Code';
+  const streakPart = `${streak}d streak`;
+  const hoursDisplay = totalMonthly < 10 ? totalMonthly.toFixed(1) : totalMonthly.toFixed(0);
+  const hoursPart = `${hoursDisplay}h ${monthShort}`;
+  const autoDisplay = autonomy > 20 ? 'AI-heavy' : `${autonomy.toFixed(1)}x AI`;
+
+  const fontSize = 11;
+  const pad = 8;
+  const h = 20;
+
+  const labelW  = Math.round(textWidth(label, fontSize)) + pad * 2;
+  const streakW = Math.round(textWidth(streakPart, fontSize)) + pad * 2;
+  const hoursW  = Math.round(textWidth(hoursPart, fontSize)) + pad * 2;
+  const autoW   = Math.round(textWidth(autoDisplay, fontSize)) + pad * 2;
+  const totalW  = labelW + streakW + hoursW + autoW;
+
+  const streakColor = streak >= 30 ? '#e05d44' : streak >= 7 ? '#fe7d37' : '#4c1';
+  const ty = 14;
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${totalW}" height="${h}" role="img" aria-label="Claude Code stats">
+  <title>Claude Code: ${escapeXml(streakPart)}, ${escapeXml(hoursPart)}, ${escapeXml(autoDisplay)}</title>
+  <linearGradient id="s" x2="0" y2="100%">
+    <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+    <stop offset="1" stop-opacity=".1"/>
+  </linearGradient>
+  <clipPath id="r">
+    <rect width="${totalW}" height="${h}" rx="3" fill="#fff"/>
+  </clipPath>
+  <g clip-path="url(#r)">
+    <rect width="${labelW}" height="${h}" fill="#3b3b3b"/>
+    <rect x="${labelW}" width="${streakW}" height="${h}" fill="${streakColor}"/>
+    <rect x="${labelW + streakW}" width="${hoursW}" height="${h}" fill="#0075ca"/>
+    <rect x="${labelW + streakW + hoursW}" width="${autoW}" height="${h}" fill="#9b59b6"/>
+    <rect width="${totalW}" height="${h}" fill="url(#s)"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="${fontSize}">
+    <text x="${labelW/2}" y="${ty}" fill="#010101" fill-opacity=".3">${escapeXml(label)}</text>
+    <text x="${labelW/2}" y="${ty-1}">${escapeXml(label)}</text>
+    <text x="${labelW+streakW/2}" y="${ty}" fill="#010101" fill-opacity=".3">${escapeXml(streakPart)}</text>
+    <text x="${labelW+streakW/2}" y="${ty-1}">${escapeXml(streakPart)}</text>
+    <text x="${labelW+streakW+hoursW/2}" y="${ty}" fill="#010101" fill-opacity=".3">${escapeXml(hoursPart)}</text>
+    <text x="${labelW+streakW+hoursW/2}" y="${ty-1}">${escapeXml(hoursPart)}</text>
+    <text x="${labelW+streakW+hoursW+autoW/2}" y="${ty}" fill="#010101" fill-opacity=".3">${escapeXml(autoDisplay)}</text>
+    <text x="${labelW+streakW+hoursW+autoW/2}" y="${ty-1}">${escapeXml(autoDisplay)}</text>
+  </g>
+</svg>`;
+}
+
+function makeShieldsUrl({ streak, totalMonthly, autonomy, monthShort }) {
+  const message = encodeURIComponent(`${streak}d streak | ${totalMonthly.toFixed(0)}h | ${autonomy.toFixed(1)}x AI`);
+  return `https://img.shields.io/badge/Claude%20Code-${message}-brightgreen`;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(stats) {
+  const svg = generateBadgeSVG(stats);
+  const shieldsUrl = makeShieldsUrl(stats);
+  const svgDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+  const streakColor = stats.streak >= 30 ? '#e05d44' : stats.streak >= 7 ? '#fe7d37' : '#56d364';
+
+  const readmeSnippet =
+`<!-- Option 1: Local SVG (regenerate daily with cron) -->
+![Claude Code](./cc-badge.svg)
+
+<!-- Option 2: shields.io static badge -->
+![Claude Code](${shieldsUrl})`;
+
+  document.getElementById('card').innerHTML = `
+    <div class="badge-preview" id="badgePreview">${svg}</div>
+
+    <div class="stats-row">
+      <div class="stat-chip">
+        <div class="stat-value" style="color:${streakColor}">${stats.streak}d</div>
+        <div class="stat-label">Current Streak</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-value" style="color:#79c0ff">${stats.totalMonthly.toFixed(1)}h</div>
+        <div class="stat-label">${stats.monthShort} Total</div>
+      </div>
+      <div class="stat-chip">
+        <div class="stat-value" style="color:#d2a8ff">${stats.autonomy.toFixed(1)}x</div>
+        <div class="stat-label">AI Autonomy</div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="section-label">Download SVG</div>
+    <button class="download-btn" id="dlBtn">⬇ Download cc-badge.svg</button>
+
+    <div class="divider"></div>
+
+    <div class="section-label">shields.io URL</div>
+    <div class="code-block">${shieldsUrl}</div>
+    <div class="copy-row"><button class="copy-btn" id="copyShields">Copy</button></div>
+
+    <div class="section-label">README Markdown Snippet</div>
+    <div class="code-block" style="white-space:pre;font-size:0.75rem;">${escHtml(readmeSnippet)}</div>
+    <div class="copy-row"><button class="copy-btn" id="copyReadme">Copy</button></div>
+  `;
+
+  document.getElementById('dlBtn').onclick = () => {
+    const a = document.createElement('a');
+    a.href = svgDataUrl;
+    a.download = 'cc-badge.svg';
+    a.click();
+  };
+
+  document.getElementById('copyShields').onclick = () => {
+    navigator.clipboard.writeText(shieldsUrl).then(() => {
+      const btn = document.getElementById('copyShields');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+  };
+
+  document.getElementById('copyReadme').onclick = () => {
+    navigator.clipboard.writeText(readmeSnippet).then(() => {
+      const btn = document.getElementById('copyReadme');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    });
+  };
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
+
+  document.getElementById('card').innerHTML = `
+    <div class="empty-state">
+      <div class="icon">⏳</div>
+      <p>Reading ${files.length} files…</p>
+    </div>`;
+
+  try {
+    const byDate = await loadByDate(files);
+    const stats = computeStats(byDate);
+    render(stats);
+  } catch (err) {
+    document.getElementById('card').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">⚠️</div>
+        <p>Error: ${err.message}</p>
+      </div>`;
+  }
+});
+</script>
+</body>
+</html>

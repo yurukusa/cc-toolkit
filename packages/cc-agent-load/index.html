@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cc-agent-load — You vs Your AI</title>
+  <meta name="description" content="See how much of your Claude Code time is you vs AI autonomous subagents. Paste your JSON to visualize.">
+  <meta property="og:title" content="cc-agent-load">
+  <meta property="og:description" content="You vs Your AI — who's doing more work?">
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e;
+      --cyan: #58d8f0; --yellow: #f7c948; --green: #56d364;
+      --orange: #ffa657; --red: #ff7b72; --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; line-height: 1.6; }
+    .container { max-width: 720px; margin: 0 auto; padding: 40px 20px; }
+    header { text-align: center; margin-bottom: 48px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: var(--cyan); margin-bottom: 8px; }
+    header p { color: var(--muted); }
+    .step-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
+    .step-box h2 { font-size: 1rem; font-weight: 600; margin-bottom: 12px; color: var(--cyan); }
+    code { background: #010409; border: 1px solid var(--border); padding: 12px 16px; border-radius: 8px; display: block; font-family: monospace; font-size: 0.9rem; color: var(--green); margin-bottom: 8px; }
+    .copy-hint { font-size: 0.8rem; color: var(--muted); }
+    textarea { width: 100%; height: 120px; background: #010409; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-family: monospace; font-size: 0.85rem; resize: vertical; }
+    textarea:focus { outline: none; border-color: var(--cyan); }
+    button { background: var(--cyan); color: #0d1117; border: none; padding: 12px 32px; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; margin-top: 12px; transition: opacity 0.15s; }
+    button:hover { opacity: 0.85; }
+    .error-msg { color: var(--red); font-size: 0.9rem; margin-top: 8px; display: none; }
+    #result { display: none; }
+    .ratio-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 16px; text-align: center; }
+    .ratio-val { font-size: 3.5rem; font-weight: 700; color: var(--yellow); }
+    .ratio-label { color: var(--muted); font-size: 0.9rem; margin-top: 4px; }
+    .vs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .vs-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; }
+    .vs-box.you { border-color: var(--cyan); }
+    .vs-box.ai { border-color: var(--yellow); }
+    .vs-val { font-size: 2rem; font-weight: 700; }
+    .vs-box.you .vs-val { color: var(--cyan); }
+    .vs-box.ai .vs-val { color: var(--yellow); }
+    .vs-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .section h3 { font-size: 0.9rem; color: var(--muted); margin-bottom: 14px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .bar-label { font-size: 0.8rem; color: var(--muted); width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: monospace; }
+    .bar-track { flex: 1; height: 14px; background: #010409; border-radius: 3px; position: relative; overflow: hidden; }
+    .bar-you { position: absolute; left: 0; top: 0; height: 100%; background: var(--cyan); border-radius: 3px 0 0 3px; }
+    .bar-ai { position: absolute; top: 0; height: 100%; background: var(--yellow); border-radius: 0 3px 3px 0; }
+    .bar-hours { font-size: 0.75rem; color: var(--muted); width: 40px; text-align: right; }
+    .verdict { text-align: center; font-size: 1.1rem; font-weight: 600; padding: 16px; border-radius: 10px; margin-bottom: 16px; }
+    .share-box { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; text-align: center; margin-top: 24px; }
+    .share-box h3 { margin-bottom: 12px; color: var(--muted); font-size: 0.9rem; }
+    .share-btn { background: #000; color: #fff; border: 1px solid #fff; padding: 10px 24px; border-radius: 24px; font-size: 0.9rem; cursor: pointer; text-decoration: none; display: inline-block; }
+    .share-btn:hover { background: #111; }
+    footer { text-align: center; color: var(--muted); font-size: 0.8rem; margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); }
+    footer a { color: var(--cyan); text-decoration: none; }
+    .legend { display: flex; gap: 16px; justify-content: center; margin-bottom: 10px; font-size: 0.8rem; color: var(--muted); }
+    .legend span { display: flex; align-items: center; gap: 4px; }
+    .dot-you { width: 10px; height: 10px; background: var(--cyan); border-radius: 2px; }
+    .dot-ai { width: 10px; height: 10px; background: var(--yellow); border-radius: 2px; }
+    .calendar-wrap { overflow-x: auto; padding-bottom: 4px; }
+    .cal-row { display: flex; align-items: center; gap: 4px; margin-bottom: 3px; }
+    .cal-label { font-size: 0.7rem; color: var(--muted); width: 24px; text-align: right; flex-shrink: 0; }
+    .cal-cells { display: flex; gap: 2px; }
+    .cal-cell { width: 11px; height: 11px; border-radius: 2px; flex-shrink: 0; cursor: default; position: relative; }
+    .cal-cell:hover::after { content: attr(data-tip); position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); background: #1c2128; border: 1px solid var(--border); color: var(--text); font-size: 0.7rem; padding: 3px 6px; border-radius: 4px; white-space: nowrap; z-index: 10; pointer-events: none; }
+    .cal-month-labels { display: flex; gap: 2px; margin-left: 28px; margin-bottom: 2px; font-size: 0.65rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>cc-agent-load</h1>
+    <p>You vs Your AI — who's doing more work?</p>
+  </header>
+
+  <div class="step-box">
+    <h2>Step 1 — Generate your data</h2>
+    <code>npx cc-agent-load --json</code>
+    <p class="copy-hint">Run this in your terminal. Copy the entire JSON output.</p>
+  </div>
+
+  <div class="step-box">
+    <h2>Step 2 — Paste your JSON</h2>
+    <textarea id="jsonInput" placeholder='Paste your JSON here...'></textarea>
+    <br>
+    <button onclick="visualize()">Show me the split →</button>
+    <p class="error-msg" id="errorMsg"></p>
+  </div>
+
+  <div id="result">
+    <div class="ratio-card">
+      <div class="ratio-val" id="ratioVal"></div>
+      <div class="ratio-label">AI Autonomy Ratio — AI ran this many times longer than you</div>
+    </div>
+
+    <div class="vs-grid">
+      <div class="vs-box you">
+        <div class="vs-val" id="youHours"></div>
+        <div class="vs-label">Your Hours</div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;" id="youSessions"></div>
+      </div>
+      <div class="vs-box ai">
+        <div class="vs-val" id="aiHours"></div>
+        <div class="vs-label">AI Subagent Hours</div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:4px;" id="aiSessions"></div>
+      </div>
+    </div>
+
+    <div class="verdict" id="verdict"></div>
+
+    <div class="section">
+      <h3>Projects — Your time vs AI load</h3>
+      <div class="legend">
+        <span><div class="dot-you"></div> You</span>
+        <span><div class="dot-ai"></div> AI</span>
+      </div>
+      <div id="projectsChart"></div>
+    </div>
+
+    <div class="section" id="calendarSection" style="display:none;">
+      <h3>Activity Calendar — You vs AI</h3>
+      <div class="legend" style="margin-bottom:8px;">
+        <span><div class="dot-you"></div> You</span>
+        <span><div class="dot-ai"></div> AI only</span>
+        <span><div style="width:10px;height:10px;background:#6e40c9;border-radius:2px;"></div> Ghost Day</span>
+        <span><div style="width:10px;height:10px;background:#3a3a3a;border-radius:2px;"></div> Inactive</span>
+      </div>
+      <div class="calendar-wrap">
+        <div class="cal-month-labels" id="calMonthLabels"></div>
+        <div class="cal-row"><span class="cal-label">You</span><div class="cal-cells" id="calYouCells"></div></div>
+        <div class="cal-row"><span class="cal-label">AI</span><div class="cal-cells" id="calAiCells"></div></div>
+      </div>
+    </div>
+
+    <div class="section" id="ghostSection" style="display:none; border-color: var(--purple);">
+      <h3 style="color: var(--purple);">Ghost Days — AI worked, you didn't</h3>
+      <div style="display:flex; gap:24px; margin-bottom:12px;">
+        <div>
+          <div style="font-size:2rem; font-weight:700; color:var(--purple);" id="ghostDaysVal"></div>
+          <div style="font-size:0.75rem; color:var(--muted);">Days AI ran alone</div>
+        </div>
+        <div>
+          <div style="font-size:2rem; font-weight:700; color:var(--yellow);" id="ghostHoursVal"></div>
+          <div style="font-size:0.75rem; color:var(--muted);">Total AI-only hours</div>
+        </div>
+      </div>
+      <div id="ghostLongest" style="font-size:0.85rem; color:var(--muted);"></div>
+    </div>
+
+    <div class="share-box">
+      <h3>Share your AI autonomy ratio</h3>
+      <a id="shareLink" class="share-btn" target="_blank" href="#">Post on X (Twitter)</a>
+    </div>
+  </div>
+
+  <div class="section" style="border-color: var(--orange); margin-top: 24px;">
+    <h3 style="color: var(--orange);">Want to control your AI load?</h3>
+    <p style="font-size: 0.9rem; color: var(--muted); margin: 8px 0 16px;"><strong style="color: var(--text);">Claude Code Production Hooks</strong> — 10 hooks + 5 templates to keep your AI in check. Used by Claude Code power users.</p>
+    <a href="https://yurukusa.gumroad.com/l/cc-codex-ops-kit" target="_blank"
+       style="display:inline-block; background: var(--orange); color: #0d1117; padding: 10px 24px; border-radius: 8px; font-weight: 700; text-decoration: none; font-size: 0.9rem;">
+      Get the Hooks Kit — $4.99 →
+    </a>
+  </div>
+
+  <footer>
+    <p>
+      <a href="https://github.com/yurukusa/cc-agent-load">GitHub</a> ·
+      <a href="https://www.npmjs.com/package/cc-agent-load">npm</a> ·
+      Zero dependencies · Runs entirely local
+    </p>
+    <p style="margin-top: 8px;">
+      <a href="https://yurukusa.github.io/cc-toolkit/" style="color:var(--orange);font-weight:600;">All tools: cc-toolkit →</a> ·
+      cc-session-stats · cc-ghost-log · cc-personality · cc-wrapped
+    </p>
+  </footer>
+</div>
+
+<script>
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function buildCalendar(byDate) {
+  const dates = Object.keys(byDate).sort();
+  if (dates.length === 0) return;
+
+  // Find date range: last 26 weeks (182 days) ending today or last date
+  const lastDate = new Date(dates[dates.length - 1]);
+  const firstDate = new Date(lastDate);
+  firstDate.setDate(firstDate.getDate() - 181);
+
+  // Build week columns (Sun to Sat)
+  const startSun = new Date(firstDate);
+  startSun.setDate(startSun.getDate() - startSun.getDay()); // go back to Sunday
+
+  const weeks = [];
+  let cur = new Date(startSun);
+  while (cur <= lastDate) {
+    const week = [];
+    for (let d = 0; d < 7; d++) {
+      week.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+
+  // Max hours for color scaling
+  let maxMain = 0, maxSub = 0;
+  for (const v of Object.values(byDate)) {
+    if (v.main > maxMain) maxMain = v.main;
+    if (v.sub > maxSub) maxSub = v.sub;
+  }
+  if (maxMain === 0) maxMain = 1;
+  if (maxSub === 0) maxSub = 1;
+
+  function intensityColor(hours, maxH, isAI, isGhost) {
+    if (isGhost) {
+      // Purple for ghost days (AI only)
+      const t = Math.min(hours / maxH, 1);
+      const a = 0.3 + t * 0.7;
+      return `rgba(110, 64, 201, ${a})`;
+    }
+    if (hours === 0) return '#1c2128';
+    const t = Math.min(hours / maxH, 1);
+    const a = 0.25 + t * 0.75;
+    return isAI ? `rgba(247, 201, 72, ${a})` : `rgba(88, 216, 240, ${a})`;
+  }
+
+  // Month labels
+  const monthLabels = document.getElementById('calMonthLabels');
+  monthLabels.innerHTML = '';
+  let lastMonth = -1;
+  weeks.forEach(week => {
+    const m = week[0].getMonth();
+    const span = document.createElement('span');
+    span.style.width = '13px';
+    span.style.display = 'inline-block';
+    if (m !== lastMonth) {
+      span.textContent = MONTHS[m];
+      lastMonth = m;
+    }
+    monthLabels.appendChild(span);
+  });
+
+  // Render rows
+  ['calYouCells', 'calAiCells'].forEach((id, rowIdx) => {
+    const isAI = rowIdx === 1;
+    const container = document.getElementById(id);
+    container.innerHTML = '';
+    weeks.forEach(week => {
+      const col = document.createElement('div');
+      col.style.display = 'flex';
+      col.style.flexDirection = 'column';
+      col.style.gap = '2px';
+      week.forEach(date => {
+        const key = date.toLocaleDateString('en-CA');
+        const entry = byDate[key] || { main: 0, sub: 0 };
+        const hours = isAI ? entry.sub : entry.main;
+        const isGhost = isAI && entry.main === 0 && entry.sub > 0;
+        const cell = document.createElement('div');
+        cell.className = 'cal-cell';
+        cell.style.background = intensityColor(hours, isAI ? maxSub : maxMain, isAI, isGhost);
+        const label = isAI ? (isGhost ? `Ghost: ${key} AI ${entry.sub.toFixed(1)}h` : `${key} AI ${entry.sub.toFixed(1)}h`) : `${key} You ${entry.main.toFixed(1)}h`;
+        cell.setAttribute('data-tip', label);
+        col.appendChild(cell);
+      });
+      container.appendChild(col);
+    });
+  });
+}
+
+function visualize() {
+  const raw = document.getElementById('jsonInput').value.trim();
+  const errEl = document.getElementById('errorMsg');
+  errEl.style.display = 'none';
+
+  let data;
+  try { data = JSON.parse(raw); } catch(e) {
+    errEl.textContent = 'Invalid JSON. Run: npx cc-agent-load --json';
+    errEl.style.display = 'block'; return;
+  }
+
+  if (data.mainHours === undefined || data.subagentHours === undefined) {
+    errEl.textContent = 'Missing required fields. Run: npx cc-agent-load --json';
+    errEl.style.display = 'block'; return;
+  }
+
+  document.getElementById('ratioVal').textContent = data.autonomyRatio.toFixed(1) + 'x';
+  document.getElementById('youHours').textContent = data.mainHours.toFixed(1) + 'h';
+  document.getElementById('youSessions').textContent = (data.mainSessions || 0) + ' sessions';
+  document.getElementById('aiHours').textContent = data.subagentHours.toFixed(1) + 'h';
+  document.getElementById('aiSessions').textContent = (data.subagentSessions || 0) + ' sessions';
+
+  const v = document.getElementById('verdict');
+  const r = data.autonomyRatio;
+  if (r >= 2) {
+    v.style.background = 'rgba(247,201,72,0.1)';
+    v.style.color = '#f7c948';
+    v.style.borderColor = '#f7c948';
+    v.textContent = '🤖 Your AI is working harder than you.';
+  } else if (r >= 1) {
+    v.style.background = 'rgba(88,166,255,0.1)';
+    v.style.color = '#58a6ff';
+    v.textContent = '⚡ Your AI matches your pace.';
+  } else if (r >= 0.5) {
+    v.style.background = 'rgba(86,211,100,0.1)';
+    v.style.color = '#56d364';
+    v.textContent = '🧑‍💻 You\'re in the driver\'s seat.';
+  } else {
+    v.style.background = 'rgba(86,211,100,0.08)';
+    v.style.color = '#56d364';
+    v.textContent = '🚗 You\'re driving manually.';
+  }
+
+  const projects = (data.topProjects || []).slice(0, 8);
+  const chart = document.getElementById('projectsChart');
+  chart.innerHTML = '';
+  if (projects.length > 0) {
+    const maxTotal = Math.max(...projects.map(p => p.total));
+    projects.forEach(p => {
+      const youW = maxTotal > 0 ? (p.main / maxTotal) : 0;
+      const aiW = maxTotal > 0 ? (p.sub / maxTotal) : 0;
+      const row = document.createElement('div');
+      row.className = 'bar-row';
+      row.innerHTML = `
+        <span class="bar-label" title="${p.name}">${p.name}</span>
+        <div class="bar-track">
+          <div class="bar-you" style="width:${youW * 100}%"></div>
+          <div class="bar-ai" style="left:${youW * 100}%; width:${aiW * 100}%"></div>
+        </div>
+        <span class="bar-hours">${p.total.toFixed(1)}h</span>
+      `;
+      chart.appendChild(row);
+    });
+  }
+
+  // Activity Calendar
+  if (data.byDate && Object.keys(data.byDate).length > 0) {
+    document.getElementById('calendarSection').style.display = 'block';
+    buildCalendar(data.byDate);
+  }
+
+  // Ghost Days
+  if (data.ghostDays && data.ghostDays > 0) {
+    document.getElementById('ghostSection').style.display = 'block';
+    document.getElementById('ghostDaysVal').textContent = data.ghostDays;
+    document.getElementById('ghostHoursVal').textContent = (data.ghostHours || 0).toFixed(1) + 'h';
+    const longest = data.longestGhostDay;
+    if (longest) {
+      document.getElementById('ghostLongest').textContent = `Longest: ${longest.date} — ${longest.hours.toFixed(1)}h of AI-only work`;
+    }
+  }
+
+  const ghostNote = data.ghostDays ? ` — ${data.ghostDays} Ghost Days` : '';
+  const shareText = `My Claude Code AI load:\n${data.mainPct}% me / ${data.subPct}% AI — ${data.autonomyRatio.toFixed(1)}x autonomy ratio${ghostNote}\nCheck yours: https://yurukusa.github.io/cc-agent-load/\nnpx cc-agent-load\n#ClaudeCode`;
+  document.getElementById('shareLink').href = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
+
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+}
+</script>
+</body>
+</html>

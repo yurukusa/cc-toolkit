@@ -1,0 +1,37 @@
+{
+  "name": "@yurukusa/cc-alert",
+  "version": "1.0.1",
+  "description": "Streak risk notifier for Claude Code — cron-friendly warning before your streak dies",
+  "type": "module",
+  "bin": {
+    "cc-alert": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "productivity",
+    "streak",
+    "notification",
+    "cli",
+    "cc-toolkit"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yurukusa/cc-alert"
+  },
+  "homepage": "https://yurukusa.github.io/cc-toolkit/",
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "cc-agent-load": ">=1.0.0"
+  }
+}

@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cc-delta — Claude Code Edit Size Analysis</title>
+<meta name="description" content="57% of Claude Code edits are surgical (&lt;100 chars). Massive rewrites are only 3.6% but account for 40% of changed content. Claude adds 18% more than it removes.">
+<meta property="og:title" content="cc-delta — How Big Are Claude's Edits?">
+<meta property="og:description" content="57% surgical, 3.6% massive. Claude's median edit expands code by 1.12×. Analyze your own edit patterns.">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0d1117;color:#e6edf3;font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+.hero{background:linear-gradient(135deg,#161b22 0%,#0d1117 100%);border-bottom:1px solid #21262d;padding:48px 24px 40px;text-align:center}
+.hero h1{font-size:2.2rem;font-weight:700;color:#f0f6fc;letter-spacing:-0.5px}
+.hero h1 span{color:#f0883e}
+.hero p{color:#8b949e;margin-top:10px;font-size:1.05rem;max-width:540px;margin-inline:auto}
+.cmd{display:inline-block;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 18px;font-family:monospace;font-size:1rem;color:#79c0ff;margin-top:18px}
+.drop-zone{border:2px dashed #30363d;border-radius:12px;padding:32px;margin:28px auto;max-width:500px;text-align:center;cursor:pointer;transition:.2s;color:#8b949e;font-size:.95rem}
+.drop-zone:hover,.drop-zone.drag{border-color:#f0883e;color:#f0883e}
+.drop-zone.loaded{border-color:#3fb950;color:#3fb950}
+#status{text-align:center;color:#8b949e;font-size:.9rem;margin-bottom:8px}
+.main{max-width:960px;margin:0 auto;padding:32px 16px}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:24px}
+.stat-box{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:14px 16px;text-align:center}
+.stat-val{font-size:1.7rem;font-weight:700;color:#f0883e}
+.stat-lbl{font-size:.8rem;color:#8b949e;margin-top:3px}
+
+.card{background:#161b22;border:1px solid #21262d;border-radius:10px;padding:20px;margin-bottom:24px}
+.card-title{font-size:1rem;font-weight:600;color:#f0f6fc;margin-bottom:6px}
+.card-sub{font-size:.82rem;color:#8b949e;margin-bottom:16px}
+
+/* Tier bars */
+.tier-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.tier-label{width:140px;font-size:.82rem;font-family:monospace;color:#8b949e;text-align:right;flex-shrink:0}
+.tier-track{flex:1;background:#21262d;border-radius:4px;height:26px;overflow:hidden;position:relative}
+.tier-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.tier-count{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:.76rem;font-family:monospace;color:#e6edf3}
+
+/* Ratio histogram */
+.ratio-bars{display:flex;align-items:flex-end;gap:4px;height:80px;margin-bottom:8px}
+.ratio-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.ratio-bar-inner{width:100%;border-radius:2px 2px 0 0;background:#f0883e;opacity:.75;transition:height .5s ease}
+.ratio-bar-lbl{font-size:.6rem;color:#484f58;white-space:nowrap}
+
+/* Ext table */
+.ext-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.ext-table th{text-align:left;color:#8b949e;font-weight:500;padding:4px 8px;border-bottom:1px solid #21262d}
+.ext-table td{padding:6px 8px;font-family:monospace;border-bottom:1px solid #161b22}
+.ext-table tr:hover td{background:#1c2128}
+
+/* Insight */
+.insight ul{list-style:none;display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.insight li{font-size:.88rem;color:#8b949e;padding-left:18px;position:relative;line-height:1.5}
+.insight li::before{content:'→';position:absolute;left:0;color:#f0883e}
+.insight li strong{color:#e6edf3}
+
+.footer{text-align:center;padding:32px 16px;color:#8b949e;font-size:.85rem;border-top:1px solid #21262d;margin-top:16px}
+.footer a{color:#58a6ff;text-decoration:none}
+</style>
+</head>
+<body>
+<div class="hero">
+  <h1>cc-<span>delta</span></h1>
+  <p>How big are Claude's edits? 57% are surgical (&lt;100 chars). Massive rewrites (2000+) are only 3.6% but dominate total changed content. Median expansion: 1.12×.</p>
+  <div class="cmd">npx cc-delta</div>
+</div>
+
+<div class="main">
+  <div class="drop-zone" id="dropZone">
+    <div>📁 Drop your <code>~/.claude/projects/</code> folder here</div>
+    <div style="margin-top:6px;font-size:.82rem">or click to select</div>
+    <input type="file" id="fileInput" webkitdirectory style="display:none">
+  </div>
+  <div id="status">No data loaded — showing sample data from 1,835 sessions</div>
+  <div id="results"></div>
+</div>
+
+<div class="footer">
+  Part of <a href="https://yurukusa.github.io/cc-toolkit/">cc-toolkit</a> — 90 tools for Claude Code &nbsp;|&nbsp;
+  <a href="https://github.com/yurukusa/cc-delta">GitHub</a> &nbsp;|&nbsp;
+  <a href="https://www.npmjs.com/package/cc-delta">npm</a>
+</div>
+
+<script>
+const SAMPLE = {
+  sessions: 1835,
+  totalEdits: 17295,
+  totalOldChars: 2841000,
+  totalNewChars: 3362000,
+  tierCounts: { micro: 4120, surgical: 5716, moderate: 5189, large: 1641, massive: 629 },
+  ratioHist: [
+    { label: '<0.5',   count: 2140 },
+    { label: '0.5-0.9',count: 3248 },
+    { label: '≈1.0',   count: 1798 },
+    { label: '1.1-1.5',count: 4912 },
+    { label: '1.5-2',  count: 2543 },
+    { label: '2-4',    count: 1832 },
+    { label: '4+',     count:  822 },
+  ],
+  ratioStats: { median: 1.12, mean: 1.18, p90: 2.41 },
+  shrinkPct: 31.2, growPct: 58.4, samePct: 10.4,
+  topExt: [
+    { ext: 'py',   count: 5842, avgOld: 312, ratio: 1.22 },
+    { ext: 'md',   count: 3109, avgOld: 184, ratio: 1.31 },
+    { ext: 'html', count: 2847, avgOld: 428, ratio: 1.19 },
+    { ext: 'mjs',  count: 1923, avgOld: 281, ratio: 1.16 },
+    { ext: 'json', count:  891, avgOld:  89, ratio: 1.04 },
+    { ext: 'ts',   count:  734, avgOld: 203, ratio: 1.21 },
+    { ext: 'sh',   count:  312, avgOld:  97, ratio: 1.11 },
+    { ext: 'txt',  count:  183, avgOld:  62, ratio: 1.08 },
+  ],
+};
+
+const INSIGHTS = [
+  '<strong>57% of edits are small (micro + surgical, &lt;100 chars)</strong> — most Claude Code edits are targeted fixes, not rewrites.',
+  '<strong>Claude adds more than it removes (median 1.12×)</strong> — your codebase grows with each session. 58% of edits expand the file.',
+  '<strong>Massive edits (2000+ chars) are only 3.6%</strong> but account for ~40% of total changed content. The heavy lifters.',
+  '<strong>Markdown expands most (1.31×)</strong> — docs and READMEs are where Claude adds the most content per edit.',
+  '<strong>JSON expands least (1.04×)</strong> — config changes are tight and precise. Nearly no net addition.',
+  '<strong>p90 expansion ratio is 2.41×</strong> — 10% of edits more than double the original content.',
+];
+
+const TIER_COLORS = {
+  micro: '#21262d', surgical: '#1f6feb', moderate: '#f0883e',
+  large: '#e3b341', massive: '#f85149',
+};
+const TIER_DEFS = [
+  { key: 'micro',    label: 'micro (<20)      ' },
+  { key: 'surgical', label: 'surgical (20-99) ' },
+  { key: 'moderate', label: 'moderate (100-499)' },
+  { key: 'large',    label: 'large (500-1999)  ' },
+  { key: 'massive',  label: 'massive (2000+)   ' },
+];
+
+function renderAll(d) {
+  const { sessions, totalEdits, totalOldChars, totalNewChars,
+    tierCounts, ratioHist, ratioStats, shrinkPct, growPct, samePct,
+    topExt } = d;
+  const growthPct = totalOldChars > 0
+    ? ((totalNewChars / totalOldChars - 1) * 100).toFixed(1) : '—';
+
+  const maxTier = Math.max(...Object.values(tierCounts));
+  const tierHtml = TIER_DEFS.map(t => {
+    const n = tierCounts[t.key];
+    const p = totalEdits > 0 ? (n / totalEdits * 100).toFixed(1) : '0.0';
+    const w = maxTier > 0 ? (n / maxTier * 100).toFixed(1) : 0;
+    return `<div class="tier-row">
+      <div class="tier-label">${t.label}</div>
+      <div class="tier-track">
+        <div class="tier-fill" style="width:${w}%;background:${TIER_COLORS[t.key]}"></div>
+        <div class="tier-count">${n.toLocaleString()} (${p}%)</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const maxRatio = Math.max(...ratioHist.map(r => r.count));
+  const ratioHtml = ratioHist.map(r => {
+    const h = maxRatio > 0 ? Math.max(4, r.count / maxRatio * 76) : 4;
+    return `<div class="ratio-bar-wrap">
+      <div class="ratio-bar-inner" style="height:${h}px"></div>
+      <div class="ratio-bar-lbl">${r.label}</div>
+    </div>`;
+  }).join('');
+
+  const extHtml = topExt.map(e => `<tr>
+    <td style="color:#79c0ff">.${e.ext}</td>
+    <td style="color:#e6edf3">${e.count.toLocaleString()}</td>
+    <td style="color:#8b949e">${e.avgOld} chars</td>
+    <td style="color:${e.ratio >= 1.2 ? '#3fb950' : e.ratio <= 1.05 ? '#8b949e' : '#f0883e'}">${e.ratio.toFixed(2)}×</td>
+  </tr>`).join('');
+
+  const insHtml = INSIGHTS.map(i => `<li>${i}</li>`).join('');
+
+  document.getElementById('results').innerHTML = `
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-val">${totalEdits.toLocaleString()}</div><div class="stat-lbl">total edits</div></div>
+      <div class="stat-box"><div class="stat-val">${ratioStats.median}×</div><div class="stat-lbl">median expansion</div></div>
+      <div class="stat-box"><div class="stat-val">+${growthPct}%</div><div class="stat-lbl">net code growth</div></div>
+      <div class="stat-box"><div class="stat-val">${growPct}%</div><div class="stat-lbl">edits that expand</div></div>
+    </div>
+    <div class="card insight">
+      <div class="card-title">Key findings — ${sessions.toLocaleString()} sessions, ${totalEdits.toLocaleString()} Edit calls analyzed</div>
+      <ul>${insHtml}</ul>
+    </div>
+    <div class="card">
+      <div class="card-title">Edit Size Distribution</div>
+      <div class="card-sub">Classified by old_string length — what you're replacing</div>
+      ${tierHtml}
+    </div>
+    <div class="card">
+      <div class="card-title">Expansion Ratio Distribution</div>
+      <div class="card-sub">new_len / old_len — how much Claude adds vs removes</div>
+      <div class="ratio-bars">${ratioHtml}</div>
+      <div style="font-size:.82rem;color:#8b949e">
+        Median ${ratioStats.median}× &nbsp;|&nbsp; Mean ${ratioStats.mean}× &nbsp;|&nbsp; p90 ${ratioStats.p90}× &nbsp;|&nbsp;
+        Shrink ${shrinkPct}% / Grow ${growPct}% / Same ${samePct}%
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">By File Type</div>
+      <div class="card-sub">Edit count, average change size, and expansion ratio per extension</div>
+      <table class="ext-table">
+        <thead><tr><th>Ext</th><th>Edits</th><th>Avg size</th><th>Expansion</th></tr></thead>
+        <tbody>${extHtml}</tbody>
+      </table>
+    </div>`;
+}
+
+// ── JSONL parsing ─────────────────────────────────────────────────
+function extOf(fp) {
+  if (!fp) return 'unknown';
+  const m = fp.match(/\.([^./]+)$/);
+  return m ? m[1].toLowerCase() : 'noext';
+}
+function tierOf(n) {
+  if (n < 20) return 'micro';
+  if (n < 100) return 'surgical';
+  if (n < 500) return 'moderate';
+  if (n < 2000) return 'large';
+  return 'massive';
+}
+
+async function processFiles(files) {
+  const jsonlFiles = [...files].filter(f => f.name.endsWith('.jsonl'));
+  document.getElementById('status').textContent = `Processing ${jsonlFiles.length} session files…`;
+
+  const tierCounts = { micro:0, surgical:0, moderate:0, large:0, massive:0 };
+  const extMap = {};
+  const ratios = [];
+  let totalEdits=0, totalOld=0, totalNew=0, sessions=0;
+
+  for (const file of jsonlFiles) {
+    const text = await file.text();
+    let fileEdits = 0;
+    for (const line of text.split('\n')) {
+      if (!line.includes('"Edit"')) continue;
+      try {
+        const obj = JSON.parse(line);
+        const content = (obj.message || obj).content;
+        if (!Array.isArray(content)) continue;
+        for (const b of content) {
+          if (b.type !== 'tool_use' || b.name !== 'Edit' || !b.input) continue;
+          const oldLen = (b.input.old_string || '').length;
+          const newLen = (b.input.new_string || '').length;
+          if (oldLen === 0 && newLen === 0) continue;
+          fileEdits++; totalEdits++;
+          totalOld += oldLen; totalNew += newLen;
+          tierCounts[tierOf(oldLen)]++;
+          const ext = extOf(b.input.file_path || '');
+          if (!extMap[ext]) extMap[ext] = { count:0, oldTotal:0, newTotal:0 };
+          extMap[ext].count++; extMap[ext].oldTotal += oldLen; extMap[ext].newTotal += newLen;
+          if (oldLen > 0) ratios.push(newLen / oldLen);
+        }
+      } catch {}
+    }
+    if (fileEdits >= 3) sessions++;
+  }
+
+  // ratio histogram
+  const bins = [
+    { label:'<0.5', min:0, max:0.5 },
+    { label:'0.5-0.9', min:0.5, max:0.9 },
+    { label:'≈1.0', min:0.9, max:1.1 },
+    { label:'1.1-1.5', min:1.1, max:1.5 },
+    { label:'1.5-2', min:1.5, max:2 },
+    { label:'2-4', min:2, max:4 },
+    { label:'4+', min:4, max:Infinity },
+  ];
+  const ratioHist = bins.map(b => ({
+    label: b.label,
+    count: ratios.filter(r => r >= b.min && r < b.max).length,
+  }));
+  const sortedR = [...ratios].sort((a,b)=>a-b);
+  const med = sortedR[Math.floor(sortedR.length*0.5)] || 1;
+  const p90 = sortedR[Math.floor(sortedR.length*0.9)] || 1;
+  const mean = ratios.length ? ratios.reduce((a,b)=>a+b,0)/ratios.length : 1;
+  const shrink = ratios.filter(r=>r<1).length;
+  const grow = ratios.filter(r=>r>1.05).length;
+  const same = ratios.length - shrink - grow;
+
+  const topExt = Object.entries(extMap)
+    .sort(([,a],[,b])=>b.count-a.count).slice(0,8)
+    .map(([ext,s]) => ({
+      ext, count: s.count,
+      avgOld: +(s.oldTotal/s.count).toFixed(0),
+      ratio: s.oldTotal > 0 ? +(s.newTotal/s.oldTotal).toFixed(2) : 1,
+    }));
+
+  document.getElementById('status').textContent = `Analyzed ${sessions.toLocaleString()} sessions`;
+  renderAll({
+    sessions, totalEdits, totalOldChars: totalOld, totalNewChars: totalNew,
+    tierCounts, ratioHist,
+    ratioStats: { median: +med.toFixed(2), mean: +mean.toFixed(2), p90: +p90.toFixed(2) },
+    shrinkPct: +(shrink/ratios.length*100).toFixed(1),
+    growPct: +(grow/ratios.length*100).toFixed(1),
+    samePct: +(same/ratios.length*100).toFixed(1),
+    topExt,
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+renderAll(SAMPLE);
+
+const dz = document.getElementById('dropZone');
+const fi = document.getElementById('fileInput');
+dz.addEventListener('click', () => fi.click());
+fi.addEventListener('change', () => { if (fi.files.length) processFiles(fi.files); });
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag');
+  const allFiles = [];
+  let pending = 0;
+  function traverse(entry) {
+    if (entry.isFile) {
+      pending++;
+      entry.file(f => { allFiles.push(f); if (--pending === 0) processFiles(allFiles); });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      function readAll() { reader.readEntries(entries => { if (!entries.length) return; entries.forEach(traverse); readAll(); }); }
+      readAll();
+    }
+  }
+  for (const item of e.dataTransfer.items) { const e2 = item.webkitGetAsEntry(); if (e2) traverse(e2); }
+  dz.classList.add('loaded');
+  dz.querySelector('div').textContent = '✓ Loading your data…';
+});
+</script>
+</body>
+</html>

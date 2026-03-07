@@ -1,0 +1,25 @@
+{
+  "name": "cc-checkin",
+  "version": "1.0.0",
+  "description": "When does your human check in? Timing of user messages within Claude Code sessions — early supervisors vs long-trust autonomous runs.",
+  "type": "module",
+  "bin": {
+    "cc-checkin": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "developer-tools",
+    "analytics",
+    "autonomy"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

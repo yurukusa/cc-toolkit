@@ -1,0 +1,25 @@
+{
+  "name": "cc-human",
+  "version": "1.0.0",
+  "description": "What does your human actually do during a Claude Code session? Pure-autonomous vs interactive, follow-up patterns, engagement split.",
+  "type": "module",
+  "bin": {
+    "cc-human": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "developer-tools",
+    "analytics",
+    "autonomy"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

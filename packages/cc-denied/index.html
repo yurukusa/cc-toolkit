@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>cc-denied — The Human Veto Log</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #e05252;      /* red for denied / danger */
+    --accent2: #f0883e;     /* orange for partial */
+    --green: #3fb950;
+    --blue: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 24px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 1.4rem; font-weight: 700; }
+  header .badge {
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+  }
+  header .sub { color: var(--muted); font-size: 0.9rem; margin-left: auto; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 32px 24px; }
+
+  .callout {
+    background: #1c1118;
+    border: 1px solid var(--accent);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 32px;
+    display: flex;
+    gap: 20px;
+    align-items: center;
+  }
+  .callout .big { font-size: 2.8rem; font-weight: 800; color: var(--accent); line-height: 1; min-width: 80px; }
+  .callout .desc h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 4px; }
+  .callout .desc p { color: var(--muted); font-size: 0.9rem; }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .stat-card .val { font-size: 1.6rem; font-weight: 700; margin-bottom: 4px; }
+  .stat-card .lbl { color: var(--muted); font-size: 0.8rem; }
+  .stat-card.red .val { color: var(--accent); }
+  .stat-card.orange .val { color: var(--accent2); }
+  .stat-card.green .val { color: var(--green); }
+  .stat-card.blue .val { color: var(--blue); }
+
+  h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 16px; }
+
+  .section { margin-bottom: 36px; }
+
+  .bar-row {
+    display: grid;
+    grid-template-columns: 160px 52px 1fr 52px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 0.88rem;
+  }
+  .bar-row .cat-name { color: var(--text); }
+  .bar-row .count { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+  .bar-wrap { background: #1c2128; border-radius: 4px; height: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  .pct { color: var(--muted); font-size: 0.8rem; text-align: right; }
+
+  .cmd-list { list-style: none; }
+  .cmd-list li {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 0.83rem;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    border-bottom: 1px solid var(--border);
+    word-break: break-all;
+  }
+  .cmd-list li:last-child { border-bottom: none; }
+  .cmd-list .cnt {
+    color: var(--accent);
+    font-weight: 700;
+    min-width: 32px;
+    text-align: right;
+  }
+  .cmd-list .cmd { color: var(--muted); }
+
+  .insight-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .insight-box p { color: var(--muted); font-size: 0.9rem; margin-bottom: 10px; line-height: 1.6; }
+  .insight-box p:last-child { margin-bottom: 0; }
+  .insight-box strong { color: var(--text); }
+
+  .install-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: monospace;
+    font-size: 0.92rem;
+    color: var(--green);
+    margin-bottom: 32px;
+    cursor: pointer;
+    user-select: all;
+  }
+  .install-box span { color: var(--muted); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 32px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+  footer a { color: var(--blue); text-decoration: none; }
+
+  #results { display: none; }
+  #error-msg { display: none; color: var(--accent); font-size: 0.9rem; margin-top: 12px; }
+
+  .upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 32px;
+    text-align: center;
+    color: var(--muted);
+    margin-bottom: 24px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .upload-area:hover { border-color: var(--accent); color: var(--text); }
+  .upload-area input { display: none; }
+  .upload-area .icon { font-size: 2rem; margin-bottom: 8px; }
+  .demo-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-top: 12px;
+  }
+  .demo-btn:hover { background: var(--accent); color: #fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>cc-denied</h1>
+  <span class="badge">veto log</span>
+  <span class="sub">Every Bash command your human said NO to</span>
+</header>
+
+<main>
+
+  <div class="install-box" title="Click to copy">
+    <span>$</span> npx cc-denied
+  </div>
+
+  <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+    <input type="file" id="fileInput" accept=".jsonl" multiple>
+    <div class="icon">🚫</div>
+    <div>Drop your Claude Code <code>.jsonl</code> session files here</div>
+    <div style="font-size:0.8rem;margin-top:4px;">or click to select • found in <code>~/.claude/projects/</code></div>
+    <button class="demo-btn" onclick="event.stopPropagation();loadDemo()">See demo data</button>
+  </div>
+  <div id="error-msg"></div>
+
+  <div id="results"></div>
+
+</main>
+
+<footer>
+  Part of <a href="https://yurukusa.github.io/cc-toolkit/">cc-toolkit</a> — 106 free tools for Claude Code users &nbsp;|&nbsp;
+  <a href="https://github.com/yurukusa/cc-denied">GitHub</a>
+</footer>
+
+<script>
+const DEMO = {
+  totalDenied: 153,
+  totalToolResults: 108315,
+  denialRate: 0.141,
+  totalSessions: 749,
+  sessionsWithDenial: 35,
+  sessionDenialRate: 4.7,
+  byCategory: {
+    'pkill / kill': 113,
+    'godot / game': 21,
+    'other': 16,
+    'server start': 2,
+    'rm / delete': 1,
+  },
+  topCommands: [
+    { cmd: 'pkill -f "godot.*aetheria" 2>/dev/null; sleep 2 && cd ~/aetheria && godot...', count: 5 },
+    { cmd: '/usr/local/bin/godot --headless 2>&1 & sleep 5; pkill -f "godot.*headle...', count: 6 },
+    { cmd: 'python3 tools/godot_test.py --gameplay tests/test_enter_dungeon.json...', count: 4 },
+    { cmd: 'pkill -f godot 2>/dev/null; sleep 1', count: 3 },
+    { cmd: 'pkill -f "godot.*autotest" 2>/dev/null; sleep 1', count: 2 },
+    { cmd: 'DISPLAY=:0 /usr/local/bin/godot --path . --run scenes/main.tscn...', count: 2 },
+    { cmd: 'pkill -f godot 2>/dev/null || true', count: 2 },
+    { cmd: 'rm -rf /tmp/godot_test_output/', count: 1 },
+    { cmd: 'python3 app.py > /tmp/flask.log 2>&1 & sleep 2 && curl localhost:5000...', count: 1 },
+    { cmd: 'pkill -f "python3 app.py" 2>/dev/null; sleep 1', count: 1 },
+  ]
+};
+
+const CAT_COLORS = {
+  'pkill / kill':  '#e05252',
+  'godot / game':  '#f0883e',
+  'rm / delete':   '#ff6b6b',
+  'git danger':    '#da3633',
+  'server start':  '#58a6ff',
+  'npm publish':   '#a371f7',
+  'other':         '#7d8590',
+};
+
+function renderResults(data) {
+  const el = document.getElementById('results');
+  const cats = Object.entries(data.byCategory).sort((a,b) => b[1]-a[1]);
+  const maxCat = cats[0]?.[1] || 1;
+
+  const topCmds = data.topCommands.slice(0, 10);
+
+  const pkillCount = data.byCategory['pkill / kill'] || 0;
+  const rmCount = data.byCategory['rm / delete'] || 0;
+  const godotCount = data.byCategory['godot / game'] || 0;
+
+  el.innerHTML = `
+    <div class="callout">
+      <div class="big">${data.totalDenied}</div>
+      <div class="desc">
+        <h2>Bash commands rejected by you</h2>
+        <p>Out of ${data.totalToolResults.toLocaleString()} tool results — ${data.denialRate.toFixed(3)}% denial rate.<br>
+        You never denied Read, Edit, Grep, or Glob. Every single NO was aimed at Bash.</p>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card red">
+        <div class="val">${data.totalDenied}</div>
+        <div class="lbl">total denials</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="val">${data.denialRate.toFixed(3)}%</div>
+        <div class="lbl">of tool calls denied</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="val">${data.sessionsWithDenial}</div>
+        <div class="lbl">sessions with a denial</div>
+      </div>
+      <div class="stat-card green">
+        <div class="val">${(100 - data.sessionDenialRate).toFixed(1)}%</div>
+        <div class="lbl">sessions approved everything</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>by category</h3>
+      ${cats.map(([cat, count]) => {
+        const pct = (count / data.totalDenied * 100).toFixed(1);
+        const w = (count / maxCat * 100).toFixed(1);
+        const color = CAT_COLORS[cat] || '#7d8590';
+        return `
+        <div class="bar-row">
+          <span class="cat-name">${cat}</span>
+          <span class="count">${count}</span>
+          <div class="bar-wrap"><div class="bar-fill" style="width:${w}%;background:${color}"></div></div>
+          <span class="pct">${pct}%</span>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div class="section">
+      <h3>most-denied commands</h3>
+      <ul class="cmd-list">
+        ${topCmds.map(({cmd, count}) => `
+        <li>
+          <span class="cnt">×${count}</span>
+          <span class="cmd">${escHtml(cmd.slice(0, 80))}</span>
+        </li>`).join('')}
+      </ul>
+    </div>
+
+    <div class="section">
+      <h3>what this means</h3>
+      <div class="insight-box">
+        ${pkillCount > 0 ? `<p><strong>${pkillCount} process kills were denied</strong> — you don't want Claude Code killing running processes blindly. This is the #1 category.</p>` : ''}
+        ${rmCount > 0 ? `<p><strong>${rmCount} deletion${rmCount > 1 ? 's' : ''} blocked</strong> — the most cautious denial in the log. CC tried to delete something and you said no.</p>` : ''}
+        ${godotCount > 0 ? `<p><strong>${godotCount} game test commands rejected</strong> — long-running Godot processes that would have consumed resources or caused instability.</p>` : ''}
+        <p>In <strong>${(100 - data.sessionDenialRate).toFixed(1)}% of sessions</strong>, you approved everything Claude Code tried to run. Trust is high. You only intervene on process management.</p>
+        <p>The overall denial rate of <strong>${data.denialRate.toFixed(3)}%</strong> means you're running in high-trust mode — one denial per ~700 tool calls.</p>
+      </div>
+    </div>
+  `;
+  el.style.display = 'block';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function loadDemo() {
+  renderResults(DEMO);
+  document.getElementById('uploadArea').style.display = 'none';
+}
+
+// File parsing
+const CATEGORIES_JS = [
+  { name: 'pkill / kill',  kw: ['pkill', 'kill -9', 'kill -15', 'killall'] },
+  { name: 'godot / game',  kw: ['/godot', 'godot --', 'godot_test'] },
+  { name: 'rm / delete',   kw: ['rm -', 'rmdir'] },
+  { name: 'git danger',    kw: ['git reset --hard', 'git push --force', 'git clean -f'] },
+  { name: 'server start',  kw: ['python3 app.py', 'flask run', 'uvicorn', 'npm start', 'node server'] },
+  { name: 'npm publish',   kw: ['npm publish', 'gh release'] },
+];
+function categorize(cmd) {
+  for (const cat of CATEGORIES_JS) {
+    if (cat.kw.some(kw => cmd.includes(kw))) return cat.name;
+  }
+  return 'other';
+}
+
+async function parseFiles(files) {
+  const toolMap = new Map();
+  const deniedIds = [];
+  const sessionsWithDenial = new Set();
+  let totalToolResults = 0;
+
+  for (const file of files) {
+    const text = await file.text();
+    const sessId = file.name.replace('.jsonl', '');
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      let obj;
+      try { obj = JSON.parse(line); } catch { continue; }
+
+      if (obj.type === 'assistant') {
+        const content = obj.message?.content;
+        if (!Array.isArray(content)) continue;
+        for (const item of content) {
+          if (item?.type === 'tool_use' && item.name === 'Bash') {
+            toolMap.set(item.id, { command: (item.input?.command || '').trim(), sessId });
+          }
+        }
+      } else if (obj.type === 'user') {
+        const content = obj.message?.content;
+        if (!Array.isArray(content)) continue;
+        for (const item of content) {
+          if (item?.type === 'tool_result') {
+            totalToolResults++;
+            if (String(item.content || '').includes('Exit code 144')) {
+              deniedIds.push(item.tool_use_id || 'unknown');
+              sessionsWithDenial.add(sessId);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const denied = deniedIds.map(tid => {
+    const info = toolMap.get(tid) || { command: '', sessId: '?' };
+    return { command: info.command, sessId: info.sessId, category: categorize(info.command) };
+  });
+
+  const byCat = {};
+  for (const d of denied) byCat[d.category] = (byCat[d.category] || 0) + 1;
+
+  const cmdCounts = {};
+  for (const d of denied) {
+    const key = d.command.slice(0, 80);
+    cmdCounts[key] = (cmdCounts[key] || 0) + 1;
+  }
+  const topCmds = Object.entries(cmdCounts).sort((a,b) => b[1]-a[1]).slice(0,10).map(([cmd,count]) => ({cmd, count}));
+
+  const totalDenied = denied.length;
+  const totalSessions = files.length;
+  return {
+    totalDenied, totalToolResults,
+    denialRate: totalToolResults > 0 ? totalDenied / totalToolResults * 100 : 0,
+    totalSessions,
+    sessionsWithDenial: sessionsWithDenial.size,
+    sessionDenialRate: totalSessions > 0 ? sessionsWithDenial.size / totalSessions * 100 : 0,
+    byCategory: byCat,
+    topCommands: topCmds,
+  };
+}
+
+document.getElementById('fileInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files).filter(f => f.name.endsWith('.jsonl'));
+  if (!files.length) return;
+  try {
+    const data = await parseFiles(files);
+    document.getElementById('uploadArea').style.display = 'none';
+    renderResults(data);
+  } catch (err) {
+    const errEl = document.getElementById('error-msg');
+    errEl.style.display = 'block';
+    errEl.textContent = 'Error parsing files: ' + err.message;
+  }
+});
+
+const area = document.getElementById('uploadArea');
+area.addEventListener('dragover', e => { e.preventDefault(); area.style.borderColor = 'var(--accent)'; });
+area.addEventListener('dragleave', () => { area.style.borderColor = 'var(--border)'; });
+area.addEventListener('drop', async (e) => {
+  e.preventDefault();
+  area.style.borderColor = 'var(--border)';
+  const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.jsonl'));
+  if (!files.length) return;
+  try {
+    const data = await parseFiles(files);
+    area.style.display = 'none';
+    renderResults(data);
+  } catch (err) {
+    const errEl = document.getElementById('error-msg');
+    errEl.style.display = 'block';
+    errEl.textContent = 'Error: ' + err.message;
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# Smithery configuration for review-ready-mcp
+# Local stdio tool — requires access to the user's filesystem and git
+# Install via: npx review-ready-mcp
+
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  commandFunction: |-
+    () => ({ command: 'npx', args: ['-y', 'review-ready-mcp'] })

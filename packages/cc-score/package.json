@@ -1,0 +1,34 @@
+{
+  "name": "cc-score",
+  "version": "1.0.1",
+  "description": "Your Claude Code AI Productivity Score \u2014 a single 0-100 number you can share",
+  "type": "module",
+  "bin": {
+    "cc-score": "cli.mjs"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "productivity",
+    "cli",
+    "cc-toolkit"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yurukusa/cc-score.git"
+  },
+  "homepage": "https://yurukusa.github.io/cc-toolkit/",
+  "engines": {
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "cc-agent-load": ">=1.0.0"
+  }
+}

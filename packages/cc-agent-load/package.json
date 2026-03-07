@@ -1,0 +1,32 @@
+{
+  "name": "cc-agent-load",
+  "version": "1.1.0",
+  "description": "See how much of your Claude Code time is YOU vs AI autonomous subagents.",
+  "bin": {
+    "cc-agent-load": "cli.mjs"
+  },
+  "type": "module",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai",
+    "subagent",
+    "autonomy",
+    "productivity",
+    "time-tracking"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yurukusa/cc-agent-load.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ]
+}

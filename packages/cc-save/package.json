@@ -1,0 +1,26 @@
+{
+  "name": "cc-save",
+  "version": "1.0.0",
+  "description": "How much money has Claude's prompt cache saved you? Cache savings analysis — the real dollar value of cache_read vs fresh input tokens.",
+  "type": "module",
+  "bin": {
+    "cc-save": "./cli.mjs"
+  },
+  "scripts": {
+    "start": "node cli.mjs"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "ai",
+    "developer-tools",
+    "analytics",
+    "cost",
+    "cache"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

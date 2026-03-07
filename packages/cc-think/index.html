@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cc-think — How deeply does Claude think?</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --dim: #8b949e;
+    --green: #3fb950; --yellow: #d29922; --blue: #58a6ff;
+    --purple: #bc8cff; --red: #f85149; --accent: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; padding: 2rem 1rem; }
+  .container { max-width: 780px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: .25rem; }
+  h1 span { color: var(--accent); }
+  .subtitle { color: var(--dim); font-size: .9rem; margin-bottom: 2rem; }
+
+  .upload-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 2.5rem; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; margin-bottom: 2rem; }
+  .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: #1c2230; }
+  .upload-zone p { color: var(--dim); font-size: .9rem; margin-top: .5rem; }
+  .upload-btn { background: var(--accent); color: #0d1117; border: none; padding: .5rem 1.2rem; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: .9rem; }
+  .demo-btn { background: transparent; border: 1px solid var(--border); color: var(--dim); padding: .4rem 1rem; border-radius: 6px; cursor: pointer; font-size: .85rem; margin-top: .75rem; }
+  .demo-btn:hover { border-color: var(--accent); color: var(--text); }
+
+  #results { display: none; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; margin-bottom: 1rem; }
+  .card-title { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: .75rem; }
+
+  .big-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: .75rem; margin-bottom: 1rem; }
+  .stat-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; text-align: center; }
+  .stat-val { font-size: 1.8rem; font-weight: 800; line-height: 1; }
+  .stat-key { font-size: .78rem; color: var(--dim); margin-top: .3rem; }
+
+  .bar-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .6rem; font-size: .85rem; }
+  .bar-label { width: 70px; color: var(--dim); flex-shrink: 0; }
+  .bar-track { flex: 1; height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 5px; transition: width .6s ease; }
+  .bar-pct { width: 42px; text-align: right; font-weight: 600; }
+  .bar-count { width: 55px; color: var(--dim); font-size: .78rem; }
+
+  .split-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; margin-bottom: .75rem; }
+  .split-seg { transition: width .6s ease; }
+
+  .stat-row { display: flex; gap: 2rem; flex-wrap: wrap; }
+  .stat { display: flex; flex-direction: column; }
+  .sv { font-size: 1.4rem; font-weight: 700; }
+  .sk { font-size: .78rem; color: var(--dim); }
+
+  .insight { background: #1b0f2e; border: 1px solid var(--purple); border-radius: 8px; padding: 1rem 1.25rem; font-size: .9rem; line-height: 1.5; margin-bottom: 1rem; }
+
+  .path-hint { background: #1e1a0c; border: 1px solid var(--border); border-radius: 6px; padding: .6rem 1rem; font-size: .8rem; color: var(--dim); font-family: monospace; margin-bottom: 2rem; }
+  @media(max-width:540px){ .big-stats{ grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1><span>cc-think</span></h1>
+  <p class="subtitle">How deeply does Claude Code think before acting?</p>
+
+  <div class="path-hint">📁 ~/.claude/projects/&lt;project&gt;/*.jsonl — drag files below</div>
+
+  <div class="upload-zone" id="dropZone">
+    <button class="upload-btn" onclick="document.getElementById('fi').click()">Upload JSONL files</button>
+    <p>or drag and drop from ~/.claude/projects/</p>
+    <br>
+    <button class="demo-btn" onclick="loadDemo()">Try with demo data</button>
+    <input type="file" id="fi" accept=".jsonl" multiple style="display:none" onchange="handleFiles(this.files)">
+  </div>
+
+  <div id="results">
+    <div class="big-stats">
+      <div class="stat-box">
+        <div class="stat-val" id="thinkPct" style="color:var(--purple)">—</div>
+        <div class="stat-key">sessions with thinking</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="totalBlocks" style="color:var(--blue)">—</div>
+        <div class="stat-key">thinking blocks total</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="totalChars" style="color:var(--green)">—</div>
+        <div class="stat-key">chars of hidden reasoning</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Thinking depth distribution</div>
+      <div class="bar-row">
+        <span class="bar-label">micro</span>
+        <div class="bar-track"><div class="bar-fill" id="bMicro" style="background:var(--dim)"></div></div>
+        <span class="bar-pct" id="pMicro">—</span>
+        <span class="bar-count" id="cMicro"></span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">brief</span>
+        <div class="bar-track"><div class="bar-fill" id="bBrief" style="background:var(--green)"></div></div>
+        <span class="bar-pct" id="pBrief">—</span>
+        <span class="bar-count" id="cBrief"></span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">medium</span>
+        <div class="bar-track"><div class="bar-fill" id="bMedium" style="background:var(--blue)"></div></div>
+        <span class="bar-pct" id="pMedium">—</span>
+        <span class="bar-count" id="cMedium"></span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">deep</span>
+        <div class="bar-track"><div class="bar-fill" id="bDeep" style="background:var(--purple)"></div></div>
+        <span class="bar-pct" id="pDeep">—</span>
+        <span class="bar-count" id="cDeep"></span>
+      </div>
+      <p style="font-size:.75rem;color:var(--dim);margin-top:.75rem">micro &lt;50c &nbsp;|&nbsp; brief 50–299c &nbsp;|&nbsp; medium 300–1999c &nbsp;|&nbsp; deep 2000+c</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Block stats</div>
+      <div class="stat-row">
+        <div class="stat"><div class="sv" id="medLen">—</div><div class="sk">median chars/block</div></div>
+        <div class="stat"><div class="sv" id="meanLen">—</div><div class="sk">mean chars/block</div></div>
+        <div class="stat"><div class="sv" id="maxLen">—</div><div class="sk">max chars (one block)</div></div>
+        <div class="stat"><div class="sv" id="medBps">—</div><div class="sk">median blocks/session</div></div>
+        <div class="stat"><div class="sv" id="maxBps">—</div><div class="sk">max blocks/session</div></div>
+      </div>
+    </div>
+
+    <div id="insightBox"></div>
+  </div>
+</div>
+
+<script>
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+dz.addEventListener('dragleave', ()=> dz.classList.remove('drag'));
+dz.addEventListener('drop', e=>{ e.preventDefault(); dz.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+function handleFiles(files) {
+  Promise.all([...files].map(f => new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsText(f); })))
+    .then(texts => analyze(texts.join('\n')));
+}
+
+function analyze(raw) {
+  const lines = raw.split('\n');
+  const sessions = {};
+  const allLengths = [];
+
+  for (const line of lines) {
+    if (!line.includes('"thinking"')) continue;
+    let d; try { d = JSON.parse(line); } catch { continue; }
+    const msg = d.message || d;
+    if (!msg || msg.role !== 'assistant') continue;
+    const sid = d.sessionId || d.session_id || 'x';
+    if (!sessions[sid]) sessions[sid] = 0;
+    for (const c of (msg.content||[])) {
+      if (c && c.type === 'thinking') {
+        const len = (c.thinking||'').length;
+        allLengths.push(len);
+        sessions[sid]++;
+      }
+    }
+  }
+
+  if (!allLengths.length) { alert('No thinking blocks found.'); return; }
+  allLengths.sort((a,b)=>a-b);
+  const bps = Object.values(sessions).sort((a,b)=>a-b);
+  const total = allLengths.length;
+  const totalChars = allLengths.reduce((a,b)=>a+b,0);
+  const sessTotal = Object.keys(sessions).length;
+  const medLen = allLengths[Math.floor(total/2)];
+  const meanLen = Math.round(totalChars/total);
+  const maxLen = allLengths[total-1];
+  const medBps = bps[Math.floor(bps.length/2)];
+  const maxBps = bps[bps.length-1];
+  const micro  = allLengths.filter(x=>x<50).length;
+  const brief  = allLengths.filter(x=>x>=50&&x<300).length;
+  const medium = allLengths.filter(x=>x>=300&&x<2000).length;
+  const deep   = allLengths.filter(x=>x>=2000).length;
+
+  render({ sessTotal, total, totalChars, medLen, meanLen, maxLen, medBps, maxBps, micro, brief, medium, deep });
+}
+
+function hn(n) { return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':n; }
+function pct(n,t) { return t ? Math.round(n/t*100) : 0; }
+
+function render(d) {
+  document.getElementById('results').style.display='block';
+  document.getElementById('thinkPct').textContent = d.sessTotal + ' sess';
+  document.getElementById('totalBlocks').textContent = hn(d.total);
+  document.getElementById('totalChars').textContent = hn(d.totalChars);
+  document.getElementById('medLen').textContent = d.medLen;
+  document.getElementById('meanLen').textContent = d.meanLen;
+  document.getElementById('maxLen').textContent = hn(d.maxLen);
+  document.getElementById('medBps').textContent = d.medBps;
+  document.getElementById('maxBps').textContent = hn(d.maxBps);
+
+  const setBar = (bId,pId,cId,n) => {
+    const p = pct(n,d.total);
+    document.getElementById(bId).style.width=p+'%';
+    document.getElementById(pId).textContent=p+'%';
+    document.getElementById(cId).textContent='('+hn(n)+')';
+  };
+  setBar('bMicro','pMicro','cMicro',d.micro);
+  setBar('bBrief','pBrief','cBrief',d.brief);
+  setBar('bMedium','pMedium','cMedium',d.medium);
+  setBar('bDeep','pDeep','cDeep',d.deep);
+
+  const deepPct = pct(d.deep, d.total);
+  document.getElementById('insightBox').innerHTML = `<div class="insight">
+    <strong>${hn(d.totalChars)} chars of thinking</strong> across ${hn(d.total)} blocks.<br>
+    ${deepPct}% are deep (2000+c) — extended reasoning on hard problems.
+    Median block: ${d.medLen} chars. Most thinking is brief (&lt;300c): ${pct(d.micro+d.brief,d.total)}%.
+  </div>`;
+}
+
+function loadDemo() {
+  render({ sessTotal: 400, total: 54100, totalChars: 25200000,
+    medLen: 204, meanLen: 467, maxLen: 41552, medBps: 23, maxBps: 4504,
+    micro: 6013, brief: 26218, medium: 20079, deep: 1790 });
+}
+</script>
+</body>
+</html>

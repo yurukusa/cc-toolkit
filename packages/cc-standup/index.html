@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>cc-standup — AI Daily Standup</title>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #21262d;
+      --border: #30363d; --text: #e6edf3; --muted: #8b949e;
+      --green: #3fb950; --orange: #f0883e; --cyan: #58d8f0;
+      --blue: #58a6ff; --yellow: #d29922; --red: #f85149;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: ui-monospace,monospace; font-size: 13px; line-height: 1.5; min-height: 100vh; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 20px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 16px; }
+    header .badge { background: var(--green); color: #000; font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+    .main { padding: 20px; max-width: 700px; margin: 0 auto; }
+    .drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 40px; text-align: center; cursor: pointer; transition: border-color .2s,background .2s; margin-bottom: 20px; }
+    .drop-zone:hover,.drop-zone.drag-over { border-color: var(--green); background: rgba(63,185,80,.05); }
+    .drop-zone input { display: none; }
+    .drop-zone h2 { font-size: 15px; margin-bottom: 8px; }
+    .drop-zone p { color: var(--muted); font-size: 12px; }
+    .drop-zone .icon { font-size: 32px; margin-bottom: 12px; }
+    #output { display: none; }
+    .controls { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+    .date-select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 4px; font-family: inherit; font-size: 13px; }
+    .nav-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; }
+    .nav-btn:hover { border-color: var(--green); }
+    .format-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .format-btn.active { background: var(--green); border-color: var(--green); color: #000; }
+    .clear-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; border-radius: 4px; cursor: pointer; font-family: inherit; font-size: 12px; margin-left: auto; }
+    /* Standup card */
+    .standup-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+    .s-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .s-emoji { font-size: 20px; }
+    .s-title { font-size: 15px; font-weight: 700; color: var(--text); }
+    .s-date { font-size: 12px; color: var(--muted); }
+    .s-section { margin-bottom: 14px; }
+    .s-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .s-project-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 5px; padding-left: 12px; }
+    .s-bullet { color: var(--green); }
+    .s-proj-name { color: var(--text); font-weight: 600; }
+    .s-proj-sep { color: var(--border); }
+    .s-proj-dur { color: var(--orange); }
+    .s-proj-detail { color: var(--muted); font-size: 12px; }
+    .s-total { background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 8px 12px; display: flex; gap: 20px; flex-wrap: wrap; }
+    .s-total-item .val { font-size: 15px; font-weight: 700; color: var(--cyan); }
+    .s-total-item .lbl { font-size: 11px; color: var(--muted); }
+    .s-continuing { color: var(--blue); }
+    .s-ghost { text-align: center; padding: 24px; color: var(--muted); }
+    .s-ghost-emoji { font-size: 28px; margin-bottom: 8px; }
+    /* Copy output */
+    .copy-output { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 14px; margin-bottom: 12px; white-space: pre; font-size: 12px; overflow-x: auto; display: none; }
+    .copy-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .copy-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 5px 14px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit; }
+    .copy-btn:hover { border-color: var(--green); }
+    .copy-notice { font-size: 11px; color: var(--green); height: 16px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>📋 cc-standup</h1>
+  <span class="badge">Daily Standup</span>
+</header>
+<div class="main">
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" webkitdirectory multiple accept=".md">
+    <div class="icon">📂</div>
+    <h2>Select your proof-log folder</h2>
+    <p>Click to select the folder — usually at <code>~/ops/proof-log/</code><br>
+    Contains <code>YYYY-MM-DD.md</code> files with your AI session records.<br>
+    Processed entirely in your browser. Nothing is uploaded.</p>
+    <p style="margin-top:12px;font-size:11px;color:var(--muted)">Don't have a proof-log yet? → <a href="https://yurukusa.github.io/cc-ops-kit-landing/" target="_blank" style="color:var(--green)">cc-ops-kit</a> sets it up automatically ($19)</p>
+  </div>
+
+  <div id="output">
+    <div class="controls">
+      <button class="nav-btn" id="prevDay">◀</button>
+      <select class="date-select" id="dateSelect"></select>
+      <button class="nav-btn" id="nextDay">▶</button>
+      <span style="color:var(--muted);font-size:12px;margin-left:8px">Format:</span>
+      <button class="format-btn active" data-fmt="plain">Plain</button>
+      <button class="format-btn" data-fmt="slack">Slack</button>
+      <button class="format-btn" data-fmt="tweet">Tweet</button>
+      <button class="clear-btn" id="clearBtn">✕ Clear</button>
+    </div>
+
+    <div class="standup-card" id="standupCard"></div>
+
+    <div class="copy-row">
+      <button class="copy-btn" id="copyBtn">📋 Copy</button>
+      <span class="copy-notice" id="copyNotice"></span>
+    </div>
+    <div class="copy-output" id="copyOutput"></div>
+  </div>
+</div>
+
+<script>
+const SESSION_HEADER = /^###\s+(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})-(\d{2}:\d{2})\s+JST/;
+const WHERE_LINE     = /^-\s+どこで:\s+(.+)$/;
+const DURATION_LINE  = /^-\s+いつ:.+JST（(\d+)分）/;
+const WHAT_LINE      = /^-\s+何を:\s+(\d+)ファイル変更\s+\(\+(\d+)\/-(\d+)\)/;
+
+function parseProofLog(content) {
+  const sessions = [];
+  let cur = null;
+  for (const raw of content.split('\n')) {
+    const line = raw.trim();
+    if (SESSION_HEADER.exec(line)) {
+      if (cur) sessions.push(cur);
+      cur = { durationMin: 0, project: null, linesAdded: 0, filesChanged: 0 };
+      continue;
+    }
+    if (!cur) continue;
+    const dur = DURATION_LINE.exec(line); if (dur) { cur.durationMin = parseInt(dur[1]); continue; }
+    const whe = WHERE_LINE.exec(line);    if (whe) { cur.project = whe[1].trim(); continue; }
+    const wha = WHAT_LINE.exec(line);     if (wha) { cur.filesChanged = parseInt(wha[1]); cur.linesAdded = parseInt(wha[2]); continue; }
+  }
+  if (cur) sessions.push(cur);
+  return sessions;
+}
+
+function aggregate(sessions) {
+  const byProj = {};
+  let totalMin = 0, totalSessions = 0, totalLines = 0;
+  for (const s of sessions) {
+    if (!s.project) continue;
+    totalSessions++; totalMin += s.durationMin; totalLines += s.linesAdded;
+    if (!byProj[s.project]) byProj[s.project] = { mins: 0, sessions: 0, lines: 0 };
+    byProj[s.project].mins += s.durationMin;
+    byProj[s.project].sessions++;
+    byProj[s.project].lines += s.linesAdded;
+  }
+  const projects = Object.entries(byProj).sort((a,b) => b[1].mins - a[1].mins);
+  return { projects, totalMin, totalSessions, totalLines };
+}
+
+function fmtDur(m) {
+  const h = Math.floor(m/60), mm = m%60;
+  if (h === 0) return `${mm}m`;
+  if (mm === 0) return `${h}h`;
+  return `${h}h ${String(mm).padStart(2,'0')}m`;
+}
+function fmtNum(n) { return n.toLocaleString(); }
+function dayName(d) { const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']; return days[new Date(d + 'T12:00:00Z').getDay()]; }
+
+let byDate = {};
+let dates = [];
+let currentDateIdx = 0;
+let currentFmt = 'plain';
+let currentDate = '';
+
+function loadFiles(files) {
+  byDate = {};
+  const mdFiles = [...files].filter(f => /^\d{4}-\d{2}-\d{2}\.md$/.test(f.name));
+  if (mdFiles.length === 0) { alert('No YYYY-MM-DD.md files found. Please select your proof-log folder.'); return; }
+  let pending = mdFiles.length;
+  for (const f of mdFiles) {
+    const dateKey = f.name.replace('.md','');
+    const reader = new FileReader();
+    reader.onload = e => {
+      byDate[dateKey] = parseProofLog(e.target.result);
+      if (--pending === 0) finalize();
+    };
+    reader.readAsText(f);
+  }
+}
+
+function finalize() {
+  dates = Object.keys(byDate).sort().reverse();
+  if (dates.length === 0) return;
+  const sel = document.getElementById('dateSelect');
+  sel.innerHTML = dates.map(d => `<option value="${d}">${d} (${dayName(d)})</option>`).join('');
+  currentDateIdx = 0; currentDate = dates[0];
+  document.getElementById('dropZone').style.display = 'none';
+  document.getElementById('output').style.display = 'block';
+  renderDate(dates[0]);
+}
+
+function renderDate(date) {
+  currentDate = date;
+  const sessions = byDate[date] || [];
+  const { projects, totalMin, totalSessions, totalLines } = aggregate(sessions);
+  const card = document.getElementById('standupCard');
+  const dn = dayName(date);
+
+  if (projects.length === 0) {
+    card.innerHTML = `<div class="s-ghost"><div class="s-ghost-emoji">👻</div><div style="color:var(--red);font-weight:700">Ghost Day</div><div style="color:var(--muted);font-size:12px;margin-top:4px">AI worked autonomously. No sessions logged.</div></div>`;
+    generateCopyText(date, [], { totalMin: 0, totalSessions: 0, totalLines: 0 });
+    return;
+  }
+
+  const topProjs = projects.slice(0, 5);
+  let projHtml = '';
+  for (const [name, p] of topProjs) {
+    projHtml += `
+      <div class="s-project-row">
+        <span class="s-bullet">•</span>
+        <span class="s-proj-name">${escHtml(name)}</span>
+        <span class="s-proj-sep">—</span>
+        <span class="s-proj-dur">${fmtDur(p.mins)}</span>
+        <span class="s-proj-detail">| ${p.sessions} sessions | +${fmtNum(p.lines)} lines</span>
+      </div>`;
+  }
+
+  const continuing = topProjs.map(([n]) => n).join(', ');
+
+  card.innerHTML = `
+    <div class="s-header">
+      <span class="s-emoji">📋</span>
+      <div>
+        <div class="s-title">AI Standup</div>
+        <div class="s-date">${date} (${dn})</div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-label">✅ Yesterday's work</div>
+      ${projHtml}
+    </div>
+    <div class="s-section">
+      <div class="s-total">
+        <div class="s-total-item"><div class="val">${fmtDur(totalMin)}</div><div class="lbl">Total time</div></div>
+        <div class="s-total-item"><div class="val">${totalSessions}</div><div class="lbl">Sessions</div></div>
+        <div class="s-total-item"><div class="val">+${fmtNum(totalLines)}</div><div class="lbl">Lines added</div></div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-label">🔜 Continuing</div>
+      <div class="s-continuing" style="padding-left:12px">${escHtml(continuing)}</div>
+    </div>`;
+
+  generateCopyText(date, projects, { totalMin, totalSessions, totalLines });
+}
+
+function generateCopyText(date, projects, totals) {
+  const dn = dayName(date);
+  const out = document.getElementById('copyOutput');
+  let text = '';
+
+  if (currentFmt === 'tweet') {
+    if (projects.length === 0) {
+      text = `👻 Ghost Day ${date} — AI worked autonomously. No sessions logged.\n#ClaudeCode #AIStandup`;
+    } else {
+      const top = projects[0];
+      text = `📋 AI Standup ${date} (${dn})\n\n✅ ${top[0]} — ${fmtDur(top[1].mins)} (and ${projects.length-1} more)\n📊 Total: ${fmtDur(totals.totalMin)} | ${totals.totalSessions} sessions\n\n#ClaudeCode #AIStandup`;
+    }
+  } else if (currentFmt === 'slack') {
+    if (projects.length === 0) {
+      text = `*AI Standup — ${date} (${dn})*\n\n👻 Ghost Day — AI worked autonomously. No sessions logged.`;
+    } else {
+      const projLines = projects.slice(0,5).map(([n,p]) => `• *${n}* — \`${fmtDur(p.mins)}\` | ${p.sessions} sessions | +${fmtNum(p.lines)} lines`).join('\n');
+      text = `*📋 AI Standup — ${date} (${dn})*\n\n*✅ Yesterday's work:*\n${projLines}\n\n*📊 Total:* \`${fmtDur(totals.totalMin)}\` | ${totals.totalSessions} sessions | +${fmtNum(totals.totalLines)} lines\n\n*🔜 Continuing:* ${projects.slice(0,3).map(([n])=>n).join(', ')}`;
+    }
+  } else {
+    // plain
+    if (projects.length === 0) {
+      text = `📋 AI Standup — ${date} (${dn})\n\n👻 Ghost Day — AI worked autonomously. No sessions logged.`;
+    } else {
+      const projLines = projects.slice(0,5).map(([n,p]) => `  • ${n} — ${fmtDur(p.mins)} | ${p.sessions} sessions | +${fmtNum(p.lines)} lines`).join('\n');
+      text = `📋 AI Standup — ${date} (${dn})\n\n✅ Yesterday's work:\n${projLines}\n\n📊 Total: ${fmtDur(totals.totalMin)} | ${totals.totalSessions} sessions | +${fmtNum(totals.totalLines)} lines\n\n🔜 Continuing: ${projects.slice(0,3).map(([n])=>n).join(', ')}\n\nGenerated by cc-standup`;
+    }
+  }
+  out.textContent = text;
+  out.style.display = 'block';
+  window._copyText = text;
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// Events
+const dz = document.getElementById('dropZone'), fi = document.getElementById('fileInput');
+dz.addEventListener('click', () => fi.click());
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); loadFiles(e.dataTransfer.files); });
+fi.addEventListener('change', () => fi.files.length && loadFiles(fi.files));
+document.getElementById('dateSelect').addEventListener('change', e => {
+  currentDateIdx = dates.indexOf(e.target.value);
+  renderDate(e.target.value);
+});
+document.getElementById('prevDay').addEventListener('click', () => {
+  if (currentDateIdx < dates.length-1) { currentDateIdx++; document.getElementById('dateSelect').value = dates[currentDateIdx]; renderDate(dates[currentDateIdx]); }
+});
+document.getElementById('nextDay').addEventListener('click', () => {
+  if (currentDateIdx > 0) { currentDateIdx--; document.getElementById('dateSelect').value = dates[currentDateIdx]; renderDate(dates[currentDateIdx]); }
+});
+document.querySelectorAll('.format-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFmt = btn.dataset.fmt;
+    if (currentDate) renderDate(currentDate);
+  });
+});
+document.getElementById('copyBtn').addEventListener('click', () => {
+  if (!window._copyText) return;
+  navigator.clipboard.writeText(window._copyText).then(() => {
+    const n = document.getElementById('copyNotice');
+    n.textContent = 'Copied!';
+    setTimeout(() => { n.textContent = ''; }, 2000);
+  });
+});
+document.getElementById('clearBtn').addEventListener('click', () => {
+  byDate = {}; dates = []; currentDateIdx = 0; currentDate = '';
+  document.getElementById('dropZone').style.display = 'block';
+  document.getElementById('output').style.display = 'none';
+  document.getElementById('copyOutput').style.display = 'none';
+});
+</script>
+</body>
+</html>

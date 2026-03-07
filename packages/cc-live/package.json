@@ -1,0 +1,35 @@
+{
+  "name": "cc-live",
+  "version": "1.0.0",
+  "description": "Watch your active Claude Code session in real-time. Token usage, cache efficiency, burn rate, and cost estimate. Zero dependencies.",
+  "bin": {
+    "cc-live": "cli.mjs"
+  },
+  "type": "module",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "ai",
+    "token",
+    "usage",
+    "monitoring",
+    "real-time",
+    "cost",
+    "cache",
+    "productivity"
+  ],
+  "author": "yurukusa",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yurukusa/cc-live.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "cli.mjs",
+    "README.md",
+    "LICENSE"
+  ]
+}
