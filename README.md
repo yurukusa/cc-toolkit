@@ -74,7 +74,7 @@ These tools measure your Claude Code usage. To make it **safe**, check out:
 
 - **[cc-health-check](https://github.com/yurukusa/cc-health-check)** — Free diagnostic (20 safety checks)
 - **[claude-code-hooks](https://github.com/yurukusa/claude-code-hooks)** — Free production hooks (10 hooks + 5 templates)
-- **[Ops Kit](https://yurukusa.gumroad.com/l/cc-codex-ops-kit?utm_source=github&utm_medium=readme&utm_campaign=ops-kit)** ($19) — All hooks + tools, install.sh, ready in 15 minutes
+- **[Ops Kit](https://yurukusa.github.io/cc-ops-kit-landing/?utm_source=github&utm_medium=readme&utm_campaign=cc-toolkit?utm_source=github&utm_medium=readme&utm_campaign=ops-kit)** ($19) — All hooks + tools, install.sh, ready in 15 minutes
 
 ---
 
